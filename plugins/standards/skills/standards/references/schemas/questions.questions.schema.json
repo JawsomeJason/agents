@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "questions.jsonl line",
+  "description": "One typed question per line of .standards/questions.jsonl. Written by `scripts/questions.mjs ask`, or by hand. Each human review comment gets three questions: convention, label and severity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "review_id", "topic", "kind", "prompt", "state"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^.+#(convention|label|severity)$",
+      "description": "The review_id, a #, then the topic, such as forge:123456#label."
+    },
+    "review_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The id of the reviews.jsonl record this question is about."
+    },
+    "topic": {
+      "enum": ["convention", "label", "severity"],
+      "description": "convention asks whether the comment states a repo-wide convention. label asks which convention. severity asks how much harm ignoring it causes."
+    },
+    "kind": {
+      "enum": ["yesno", "choice", "score"],
+      "description": "yesno asks for the probability a condition holds. choice picks one of options. score picks a position on ordered levels."
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The question, phrased so it reads the same to any answerer."
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Everything the answerer judges: the comment body, its file path, and its diff hunk or commit diff when present."
+    },
+    "options": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 2,
+      "uniqueItems": true,
+      "description": "For choice questions: every label id from .standards/labels.json, plus none."
+    },
+    "levels": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 2,
+      "uniqueItems": true,
+      "description": "For score questions: the ordered levels, lowest first. Severity uses nit, minor, major, blocker."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "choice" } } },
+      "then": { "required": ["options"], "not": { "required": ["levels"] } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "score" } } },
+      "then": { "required": ["levels"], "not": { "required": ["options"] } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "yesno" } } },
+      "then": { "allOf": [{ "not": { "required": ["options"] } }, { "not": { "required": ["levels"] } }] }
+    },
+    {
+      "if": { "properties": { "topic": { "const": "convention" } } },
+      "then": { "properties": { "kind": { "const": "yesno" } } }
+    },
+    {
+      "if": { "properties": { "topic": { "const": "label" } } },
+      "then": { "properties": { "kind": { "const": "choice" } } }
+    },
+    {
+      "if": { "properties": { "topic": { "const": "severity" } } },
+      "then": { "properties": { "kind": { "const": "score" }, "levels": { "const": ["nit", "minor", "major", "blocker"] } } }
+    }
+  ]
+}

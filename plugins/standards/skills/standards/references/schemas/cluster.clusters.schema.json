@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "clusters.json",
+  "description": "The ranked conventions in .standards/clusters.json. Written by scripts/cluster.mjs, or by hand. The input to write.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["inputs", "convention_threshold", "min_count", "severity_weights", "clusters", "dropped"],
+  "properties": {
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviews", "human_reviews", "conventions", "answered_by"],
+      "properties": {
+        "reviews": { "type": "integer", "minimum": 0, "description": "Lines in reviews.jsonl." },
+        "human_reviews": { "type": "integer", "minimum": 0, "description": "Lines with author_is_bot false. Only these get questions." },
+        "conventions": { "type": "integer", "minimum": 0, "description": "Comments that passed the convention threshold and carry a label other than none." },
+        "answered_by": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "judgment-model": { "type": "integer", "minimum": 0 },
+            "agent": { "type": "integer", "minimum": 0 },
+            "human": { "type": "integer", "minimum": 0 }
+          },
+          "description": "Answer counts by answerer, so a reader knows how much of the labeling a judgment model did."
+        }
+      }
+    },
+    "convention_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Minimum probability that a comment states a convention. Default 0.5."
+    },
+    "min_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Clusters with fewer comments are dropped. Default 3."
+    },
+    "severity_weights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nit", "minor", "major", "blocker"],
+      "properties": {
+        "nit": { "type": "number" },
+        "minor": { "type": "number" },
+        "major": { "type": "number" },
+        "blocker": { "type": "number" }
+      },
+      "description": "Weight per severity level. Default nit 1, minor 2, major 3, blocker 4."
+    },
+    "clusters": {
+      "type": "array",
+      "description": "Kept clusters, sorted by score, highest first.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rank", "label", "description", "count", "severity", "score", "review_ids", "changes", "paths", "examples"],
+        "properties": {
+          "rank": { "type": "integer", "minimum": 1, "description": "1 for the highest score." },
+          "label": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The label id from labels.json." },
+          "description": { "type": "string", "minLength": 1, "description": "The label's one-sentence description from labels.json." },
+          "count": { "type": "integer", "minimum": 1, "description": "Comments in the cluster." },
+          "severity": { "type": "number", "description": "Mean severity weight of the cluster's comments, using each comment's answered level." },
+          "score": { "type": "number", "description": "count times severity." },
+          "review_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Every reviews.jsonl id in the cluster." },
+          "changes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "Distinct change numbers the comments came from." },
+          "paths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "Distinct file paths the comments are attached to. write derives globs from these." },
+          "examples": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "description": "Up to 5 comments that state the convention most plainly, for write to cite.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["review_id", "change", "path", "excerpt"],
+              "properties": {
+                "review_id": { "type": "string" },
+                "change": { "type": ["string", "null"] },
+                "path": { "type": ["string", "null"] },
+                "excerpt": { "type": "string", "minLength": 1, "maxLength": 400 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dropped": {
+      "type": "array",
+      "description": "Clusters under min_count, kept so a later mine can see a convention growing.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "count"],
+        "properties": {
+          "label": { "type": "string" },
+          "count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

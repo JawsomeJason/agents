@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reviews.jsonl line",
+  "description": "One review comment per line of .standards/reviews.jsonl. Written by scripts/fetch-reviews.mjs, or by hand when the script is missing or fails.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "source", "kind", "author", "author_is_bot", "created_at", "body"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable and unique across the file. Use the forge's own comment ID, or the commit SHA for git-log records, prefixed by source, such as forge:123456 or git-log:3f2a9c1."
+    },
+    "source": {
+      "enum": ["forge", "git-log"],
+      "description": "forge when the record came from the forge's CLI or API; git-log when no forge was reachable."
+    },
+    "kind": {
+      "enum": ["inline-comment", "review-body", "thread-reply", "commit"],
+      "description": "inline-comment is attached to a line of the diff. review-body is the summary text of a review. thread-reply answers another comment. commit is a git-log record whose message addresses review feedback."
+    },
+    "change": {
+      "type": ["string", "null"],
+      "description": "The pull or merge request number the comment belongs to, as a string. null for commit records with no known change."
+    },
+    "author": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The commenter's login, or the commit author's name for git-log records."
+    },
+    "author_is_bot": {
+      "type": "boolean",
+      "description": "true when the forge marks the account as a bot or app, or its login ends in a bot suffix such as [bot]."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the comment or commit was made, in RFC 3339 form."
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The comment text, or the full commit message, unedited."
+    },
+    "path": {
+      "type": ["string", "null"],
+      "description": "Repo-relative path of the file the comment is attached to. null when the comment is not attached to a file."
+    },
+    "line": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Line number in the new version of the file, when the forge gives one."
+    },
+    "diff_hunk": {
+      "type": ["string", "null"],
+      "description": "The diff hunk the comment sits on, when the forge gives one. For commit records, the commit's diff trimmed to the files it touches."
+    },
+    "commit": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{7,64}$",
+      "description": "The commit SHA the comment was made against, or the commit itself for git-log records."
+    },
+    "in_reply_to": {
+      "type": ["string", "null"],
+      "description": "The id of the record this one replies to, for thread-reply records."
+    },
+    "url": {
+      "type": ["string", "null"],
+      "description": "The forge's web link to the comment, kept as data so a § can cite it."
+    }
+  }
+}
