@@ -1,0 +1,145 @@
+#!/usr/bin/env node
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
+import { UsageError, check, readJsonl, readLabels } from './questions.mjs';
+
+const USAGE =
+  'usage: cluster.mjs --reviews <reviews.jsonl> --questions <questions.jsonl> --answers <answers.jsonl> --labels <labels.json> --out <clusters.json>';
+export const CONVENTION_THRESHOLD = 0.5;
+export const MIN_COUNT = 3;
+export const SEVERITY_WEIGHTS = { nit: 1, minor: 2, major: 3, blocker: 4 };
+const MAX_EXAMPLES = 5;
+const EXCERPT_MAX = 400;
+
+const round = (x) => Math.round(x * 1000) / 1000;
+
+function yesProbability(a) {
+  const p = a.distribution?.true;
+  if (typeof p === 'number') return p;
+  return a.answer === true ? a.confidence : 1 - a.confidence;
+}
+
+function excerpt(body) {
+  const flat = body.replace(/\s+/g, ' ').trim();
+  return flat.length <= EXCERPT_MAX ? flat : `${flat.slice(0, EXCERPT_MAX - 1)}…`;
+}
+
+const distinct = (values) => [...new Set(values.filter((v) => v !== null && v !== undefined))];
+
+export function cluster({ reviews, questions, answers, labels }) {
+  const { problems, answered } = check(questions, answers);
+  const blocking = problems.filter((p) => p.kind !== 'low-confidence');
+  if (blocking.length) {
+    const sample = blocking.slice(0, 5).map((p) => `${p.kind} ${p.id}`).join(', ');
+    throw new UsageError(`answers do not match questions (${blocking.length} found, such as ${sample}); run questions.mjs check`);
+  }
+  const reviewIds = new Set(reviews.map((r) => r.id));
+  const orphan = questions.find((q) => !reviewIds.has(q.review_id));
+  if (orphan) throw new UsageError(`question ${orphan.id} names a review not in the reviews file; rerun questions.mjs ask`);
+  const labelById = new Map(labels.map((l) => [l.id, l]));
+  const answer = (review, topic) => answered.get(`${review.id}#${topic}`);
+
+  const human = reviews.filter((r) => !r.author_is_bot);
+  const groups = new Map(labels.map((l) => [l.id, []]));
+  let below = 0;
+  let none = 0;
+  for (const review of human) {
+    const [convention, label, severity] = ['convention', 'label', 'severity'].map((t) => answer(review, t));
+    if (!convention || !label || !severity) throw new UsageError(`review ${review.id} lacks its three questions; rerun questions.mjs ask`);
+    if (yesProbability(convention) < CONVENTION_THRESHOLD) below++;
+    else if (label.answer === 'none') none++;
+    else {
+      if (!labelById.has(label.answer)) throw new UsageError(`label ${label.answer} is not in the labels file`);
+      groups.get(label.answer).push({ review, weight: SEVERITY_WEIGHTS[severity.answer], labelConfidence: label.confidence });
+    }
+  }
+  const kept = [...groups.values()].reduce((n, g) => n + g.length, 0);
+  if (below + none + kept !== human.length) throw new Error('cluster counts do not reconcile with human comments');
+
+  const clusters = [];
+  const dropped = [];
+  for (const [id, members] of groups) {
+    if (members.length < MIN_COUNT) {
+      dropped.push({ label: id, count: members.length });
+      continue;
+    }
+    const severity = round(members.reduce((s, m) => s + m.weight, 0) / members.length);
+    const plainest = [...members].sort(
+      (a, b) => b.labelConfidence - a.labelConfidence || a.review.body.length - b.review.body.length,
+    );
+    clusters.push({
+      label: id,
+      description: labelById.get(id).description,
+      count: members.length,
+      severity,
+      score: round(members.reduce((s, m) => s + m.weight, 0)),
+      review_ids: members.map((m) => m.review.id),
+      changes: distinct(members.map((m) => m.review.change)),
+      paths: distinct(members.map((m) => m.review.path)),
+      examples: plainest.slice(0, MAX_EXAMPLES).map(({ review }) => ({
+        review_id: review.id,
+        change: review.change ?? null,
+        path: review.path ?? null,
+        excerpt: excerpt(review.body),
+      })),
+    });
+  }
+  clusters.sort((a, b) => b.score - a.score || b.count - a.count || (a.label < b.label ? -1 : 1));
+  dropped.sort((a, b) => b.count - a.count || (a.label < b.label ? -1 : 1));
+
+  const answeredBy = { 'judgment-model': 0, agent: 0, human: 0 };
+  for (const a of answered.values()) answeredBy[a.answered_by]++;
+  return {
+    result: {
+      inputs: { reviews: reviews.length, human_reviews: human.length, conventions: kept, answered_by: answeredBy },
+      convention_threshold: CONVENTION_THRESHOLD,
+      min_count: MIN_COUNT,
+      severity_weights: SEVERITY_WEIGHTS,
+      clusters: clusters.map((c, i) => ({ rank: i + 1, ...c })),
+      dropped,
+    },
+    tally: { human: human.length, below, none, kept },
+  };
+}
+
+function main(argv) {
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: argv,
+      options: { reviews: { type: 'string' }, questions: { type: 'string' }, answers: { type: 'string' }, labels: { type: 'string' }, out: { type: 'string' } },
+    }));
+  } catch (e) {
+    throw new UsageError(`${e.message}\n${USAGE}`);
+  }
+  for (const n of ['reviews', 'questions', 'answers', 'labels', 'out']) {
+    if (!values[n]) throw new UsageError(`--${n} is required\n${USAGE}`);
+  }
+  const { result, tally } = cluster({
+    reviews: readJsonl(values.reviews, 'reviews'),
+    questions: readJsonl(values.questions, 'questions'),
+    answers: readJsonl(values.answers, 'answers'),
+    labels: readLabels(values.labels),
+  });
+  mkdirSync(dirname(values.out), { recursive: true });
+  const tmp = `${values.out}.tmp-${process.pid}`;
+  writeFileSync(tmp, `${JSON.stringify(result, null, 2)}\n`);
+  renameSync(tmp, values.out);
+  console.log(
+    `${result.clusters.length} clusters kept, ${result.dropped.length} dropped. ` +
+      `${tally.human} human comments = ${tally.below} under the convention threshold + ${tally.none} labeled none + ${tally.kept} kept`,
+  );
+  console.log(`wrote ${values.out}`);
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    main(process.argv.slice(2));
+  } catch (e) {
+    if (!(e instanceof UsageError)) throw e;
+    console.error(`cluster: ${e.message}`);
+    process.exitCode = 2;
+  }
+}
