@@ -4,6 +4,10 @@ Runs a baseline A/B per rule and deletes the rules agents follow without being t
 
 Run from the target repo's root, on standards that `write` produced. No script covers this command. Write a short script to tally runs, because the decisions below turn on exact counts.
 
+## Scope
+
+Accepts an area slug or §. See [scope](scope.md) for the forms and how to resolve them. Test only the scoped rules. State the scoped rule count in the plan and the reply, because the cost scales with the rule count.
+
 ## Setup
 
 **Pick the rules.** Probe every § unless the user names some. Show the user the plan first, with the rule count, the harnesses and the most runs it could take, because each run is a full agent session.

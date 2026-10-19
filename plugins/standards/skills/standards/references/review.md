@@ -4,6 +4,10 @@ Applies every lens a diff triggers and reports each confirmed violation with its
 
 Run from the target repo's root. No script covers this command, because matching a heuristic to code is a judgment.
 
+## Scope
+
+Accepts any form. See [scope](scope.md) for the forms and how to resolve them. A path or glob keeps only the changed files it matches, at step 3. An area or § applies only those lenses, at step 3. Scope combines with the diff source from step 1: the branch, pull request or commit still sets the diff, and the scope narrows it.
+
 ## Step 1. Get the diff
 
 Pick the diff from the request:

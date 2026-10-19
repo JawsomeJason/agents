@@ -6,6 +6,10 @@ Run every step from the target repo's root. Every work file goes in `.standards/
 
 `<skill-dir>` below is the folder that holds this skill's `SKILL.md`. Each step names a script that does it faster. When a script is missing or exits non-zero, do the step by hand and write the same file, which the step's schema defines. Every step overwrites its own output, so rerunning a step converges on the same file.
 
+## Scope
+
+Accepts a path or glob only. See [scope](scope.md) for the forms and how to resolve them. Keep only review comments whose `path` matches it, and drop the rest after step 1. An area or § is an error here: areas don't exist until `write` makes them. Say so, list the areas when standards exist, and stop.
+
 ## Step 1. Fetch review comments
 
 Output `.standards/reviews.jsonl`, one comment per line, per [the reviews schema](schemas/fetch-reviews.reviews.schema.json).

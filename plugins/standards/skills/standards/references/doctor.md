@@ -6,6 +6,10 @@ Checks generated standards for drift against the code they govern and writes the
 
 Run from the target repo's root. No script covers this command. Write a short script for steps 2 to 5, because each one matches paths or counts commits, and an eyeballed match misses files.
 
+## Scope
+
+Accepts any form. See [scope](scope.md) for the forms and how to resolve them. An area or § checks only those § files. A path or glob checks only the § files whose "Applies to" globs match a file in it. Steps 4 and 5 still read the whole `prune.json` and index, but report only findings for the scoped § files.
+
 ## Step 1. Find the standards
 
 Find every `SKILL.md` in the repo whose frontmatter `metadata` holds `generator: standards`. When there are none, ask the user for the path. When they have none, offer `mine`, and stop.

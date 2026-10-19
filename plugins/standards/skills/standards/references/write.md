@@ -4,6 +4,10 @@ Turns `.standards/clusters.json` into a standards skill inside the target repo. 
 
 Run from the target repo's root. `<skill-dir>` is the folder that holds this skill's `SKILL.md`. No script covers this command, because each step is a judgment about the repo's code.
 
+## Scope
+
+Accepts an area slug or §. See [scope](scope.md) for the forms and how to resolve them. Write or refresh only that area: its index section and its § files. Leave every other area's files and § numbers untouched, because review comments cite them. A path or glob is an error here, because `write` works on areas, not files.
+
 ## Step 1. Read the inputs
 
 1. Read `.standards/clusters.json`. When it is missing, stop and offer `mine`, because a § without mined evidence is a guess.
