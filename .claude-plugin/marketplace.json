@@ -1,5 +1,5 @@
 {
-  "name": "agents",
+  "name": "jawsome-agents",
   "description": "Harness-agnostic agent skills built on the Agent Skills spec",
   "owner": {
     "name": "Jason Featheringham",

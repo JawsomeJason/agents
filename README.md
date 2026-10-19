@@ -1,4 +1,4 @@
-# agents
+# jawsome-agents
 
 Agent skills that run in any harness that reads the [Agent Skills spec](https://agentskills.io/specification). Each skill uses only the spec's frontmatter and plain files, so the same folder installs in Claude Code, Codex, opencode and any other harness that loads skill folders.
 
@@ -18,8 +18,8 @@ Invoke it as `/standards [command] [scope]`:
 ### Claude Code
 
 ```text
-/plugin marketplace add JawsomeJason/agents
-/plugin install standards@agents
+/plugin marketplace add JawsomeJason/jawsome-agents
+/plugin install standards@jawsome-agents
 ```
 
 ### Codex and opencode
