@@ -13,6 +13,7 @@ These rules apply to every agent and person who edits this repo, in any harness.
 Read the [spec](https://agentskills.io/specification) before writing a skill. It is the most stable surface across harnesses, so a skill uses nothing beyond it.
 
 - Frontmatter uses spec keys only: `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`.
+- Extension keys are allowed only when listed in `extensionKeys` in `scripts/lint-rules.json`. Each must be one that harnesses ignore when they don't know it, and the harness smoke test must prove a skill carrying it still loads, because an unknown key some harness rejects breaks the skill there.
 - `name` matches its directory, has at most 64 characters, and uses lowercase letters, digits and single hyphens.
 - `description` stays within 1024 characters and says both what the skill does and when to use it.
 - The `SKILL.md` body stays under 5000 tokens. Rules sit in `SKILL.md` as one-liners, each linking to a file in `references/` that holds its examples.

@@ -8,6 +8,7 @@
     "charsPerToken": 4,
     "fenceMaxLines": 10
   },
+  "extensionKeys": ["argument-hint"],
   "urlAllowlist": ["agentskills.io"],
   "denylists": [
     {

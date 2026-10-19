@@ -15,6 +15,7 @@ const expected = {
   'description-missing': 'description-missing',
   'doc-scope': 'time-word',
   'fence-length': 'fence-length',
+  'extension-key-unlisted': 'frontmatter-key',
   'frontmatter-key': 'frontmatter-key',
   'frontmatter-missing': 'frontmatter-missing',
   'harness-tool': 'harness-tool',
@@ -36,13 +37,19 @@ const expected = {
   'vendor-name': 'vendor-name',
 };
 
+const passing = ['clean', 'extension-key-allowed'];
+
 test('every fixture directory has an expectation', () => {
-  const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => d !== 'clean');
+  const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => !passing.includes(d));
   assert.deepEqual(dirs.sort(), Object.keys(expected).sort());
 });
 
 test('clean fixture passes', () => {
   assert.deepEqual(lint(fixture('clean')), []);
+});
+
+test('an allowlisted extension key passes', () => {
+  assert.deepEqual(lint(fixture('extension-key-allowed')), []);
 });
 
 for (const [name, rule] of Object.entries(expected)) {

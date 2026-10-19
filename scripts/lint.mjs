@@ -119,8 +119,8 @@ function lintSkill(skillDir, report) {
     report(skillFile, 1, 'frontmatter-missing', 'SKILL.md must open with --- delimited frontmatter');
   } else {
     for (const field of fm.fields.values()) {
-      if (!spec.frontmatterKeys.includes(field.key)) {
-        report(skillFile, field.line, 'frontmatter-key', `"${field.key}" is not an Agent Skills spec key`);
+      if (!spec.frontmatterKeys.includes(field.key) && !RULES.extensionKeys.includes(field.key)) {
+        report(skillFile, field.line, 'frontmatter-key', `"${field.key}" is not an Agent Skills spec key or a listed extension key`);
       }
     }
     const name = fm.fields.get('name');
