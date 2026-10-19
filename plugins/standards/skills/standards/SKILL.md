@@ -1,6 +1,65 @@
 ---
 name: standards
-description: Turns a repo's code review history into numbered coding standards with a reason for each rule, then reviews diffs against them. Use when asked to mine review comments into conventions, write or prune a repo's standards, or review a change against them.
+description: Turns a repo's code review history into numbered coding standards, each rule with its why and the review comments behind it, then reviews diffs against them and keeps them lean. Use when writing or auditing coding standards or conventions from review history (mine, write), reviewing a diff, branch or pull request against standards (review), pruning standards that agents already follow unprompted (prune), or checking standards for drift, such as rules whose files are gone or prune data measured on an older default model (doctor).
 ---
 
-Placeholder router for the `mine`, `write`, `review`, `prune` and `doctor` commands.
+# Standards
+
+Reviewers enforce the same conventions by hand, comment after comment. This skill mines those comments into written standards, then checks diffs against them. Each standard pairs a rule an agent follows when it writes code with a lens a reviewer applies to a diff. Each numbered § cites the review comments behind it, so anyone can trace a rule back to the reviewers who enforced it.
+
+## Core principles
+
+- Evidence first. A § needs at least 3 review comments, because one or two are a single reviewer's taste.
+- Every rule carries its why. A reason still guides an agent after the code around the rule changes shape.
+- One home per convention. Two copies drift apart, and an agent follows whichever one it read first.
+- A check beats a §. A convention a linter, type or test can catch belongs in that tool, because a check runs every time.
+- Delete what agents already do. A rule followed unprompted costs context on every load and changes nothing.
+- Scripts are shortcuts. Each output file has a schema in `references/schemas/`, so when a script is missing or fails, write the same file by hand.
+- `git` is the only hard dependency. A forge's CLI, such as `gh` or `glab`, adds review comments, and `git log` stands in without one.
+
+## Commands
+
+| Command | What it does | Output | Reference |
+| --- | --- | --- | --- |
+| `mine` | Pulls review comments, labels each by convention, ranks the clusters by frequency times severity | `.standards/clusters.json` | [references/mine.md](references/mine.md) |
+| `write` | Turns ranked clusters into a standards skill in the repo, each § with its why and evidence | the standards skill | [references/write.md](references/write.md) |
+| `review` | Applies every lens a diff triggers and reports findings with the § cited | findings in the reply | [references/review.md](references/review.md) |
+| `prune` | A/B tests each rule across harnesses and deletes the ones agents follow unprompted | `prune.json` | [references/prune.md](references/prune.md) |
+| `doctor` | Flags drift: globs that match nothing, cited files that are gone, lenses that never fire, stale prune data | `.standards/doctor.json` | [references/doctor.md](references/doctor.md) |
+
+## Routing
+
+- **No argument.** Show the menu below and wait for a choice. Never auto-run a command, because each one reads history, edits the repo or spends many agent runs.
+- **An explicit or clearly implied command.** Load its reference and follow it step by step.
+- **Two commands fit.** Ask once which one, naming both and what each would do. Then follow the answer.
+- **Standards from nothing.** Start at `mine`, because `write` needs `clusters.json`. Offer `write` when `mine` finishes.
+- **A question about the skill itself.** Answer from this file without running a command.
+
+## Menu
+
+```text
+standards: what should I do?
+  mine    Mine review comments into ranked conventions
+  write   Write standards from the ranked conventions
+  review  Review a diff against the standards
+  prune   Test each rule and delete the ones agents already follow
+  doctor  Check the standards for drift
+```
+
+## Pipeline
+
+`mine` feeds `write`, and `write` produces what `review` applies. `prune` and `doctor` maintain the standards after that.
+
+Work files live in `.standards/` at the target repo's root. Keep that folder out of version control, because review comments quote code and people. `prune.json` is the exception. It lives beside the generated standards, because `doctor` reads it there.
+
+`<skill-dir>` in the references is the folder that holds this file. The scripts in `<skill-dir>/scripts/` speed up `mine` and need only a JavaScript runtime's standard library.
+
+## Judgment model
+
+`mine`, `prune` and `doctor` ask many small typed questions. A judgment model is a fast model that answers typed questions (pick one of a set, a yes/no probability, a score) with calibrated probabilities. If your environment gives you a judgment model, answer the questions file with it; otherwise answer them yourself. Your environment's own instructions decide which model that is.
+
+## Generated standards
+
+- The default output is one skill with an index of one-liners, each linking to a § file. Templates: [index](assets/index.template.md) and [section](assets/section.template.md).
+- One skill per area is an option, settled per repo by the shape experiment in [references/write.md](references/write.md).
+- Generated standards follow the same rules as this skill: spec frontmatter only, no URLs, no dates, and a why for every rule.
