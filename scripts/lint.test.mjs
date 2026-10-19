@@ -37,7 +37,7 @@ const expected = {
   'vendor-name': 'vendor-name',
 };
 
-const passing = ['clean', 'extension-key-allowed'];
+const passing = ['clean', 'doc-allow', 'extension-key-allowed'];
 
 test('every fixture directory has an expectation', () => {
   const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => !passing.includes(d));

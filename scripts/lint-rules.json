@@ -10,6 +10,7 @@
   },
   "extensionKeys": ["argument-hint"],
   "urlAllowlist": ["agentskills.io"],
+  "docAllow": ["JawsomeJason/agents"],
   "denylists": [
     {
       "rule": "harness-tool",

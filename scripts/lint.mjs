@@ -235,7 +235,10 @@ export function lint(target) {
       for (const p of readdirSync(pluginsDir)) docs.push(join(pluginsDir, p, 'README.md'));
     }
     for (const doc of docs.filter((d) => existsSync(d))) {
-      scanDenylists(doc, readFileSync(doc, 'utf8'), 'doc', report);
+      // The repo's own install slug is the one identity a doc must carry, so it is blanked first.
+      let text = readFileSync(doc, 'utf8');
+      for (const phrase of RULES.docAllow) text = text.split(phrase).join(' '.repeat(phrase.length));
+      scanDenylists(doc, text, 'doc', report);
     }
   } else {
     const skillDirs = findSkillDirs(root);
