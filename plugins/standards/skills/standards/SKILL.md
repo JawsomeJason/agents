@@ -1,6 +1,7 @@
 ---
 name: standards
 description: Turns a repo's code review history into numbered coding standards, each rule with its why and the review comments behind it, then reviews diffs against them and keeps them lean. Use when writing or auditing coding standards or conventions from review history (mine, write), reviewing a diff, branch or pull request against standards (review), pruning standards that agents already follow unprompted (prune), or checking standards for drift, such as rules whose files are gone or prune data measured on an older default model (doctor).
+argument-hint: "[mine|write|review|prune|doctor] [path|area|§]"
 ---
 
 # Standards
@@ -29,7 +30,10 @@ Reviewers enforce the same conventions by hand, comment after comment. This skil
 
 ## Routing
 
+Invoke as `standards [command] [scope]`. A scope is a path or glob, an area slug from the generated index, or a § number (`§2`, `§2.3`). Resolve it per [references/scope.md](references/scope.md).
+
 - **No argument.** Show the menu below and wait for a choice. Never auto-run a command, because each one reads history, edits the repo or spends many agent runs.
+- **A scope with no command.** Run `review` of that scope without asking, because `review` only reads.
 - **An explicit or clearly implied command.** Load its reference and follow it step by step.
 - **Two commands fit.** Ask once which one, naming both and what each would do. Then follow the answer.
 - **Standards from nothing.** Start at `mine`, because `write` needs `clusters.json`. Offer `write` when `mine` finishes.
@@ -44,7 +48,10 @@ standards: what should I do?
   review  Review a diff against the standards
   prune   Test each rule and delete the ones agents already follow
   doctor  Check the standards for drift
+Every command takes an optional scope: a path, an area or a §.
 ```
+
+When generated standards exist, list their areas under the menu as § number and slug.
 
 ## Pipeline
 
