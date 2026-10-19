@@ -1,0 +1,151 @@
+{
+  "spec": {
+    "frontmatterKeys": ["name", "description", "license", "compatibility", "metadata", "allowed-tools"],
+    "nameMaxLength": 64,
+    "descriptionMaxLength": 1024,
+    "compatibilityMaxLength": 500,
+    "bodyMaxTokens": 5000,
+    "charsPerToken": 4,
+    "fenceMaxLines": 10
+  },
+  "urlAllowlist": ["agentskills.io"],
+  "denylists": [
+    {
+      "rule": "harness-tool",
+      "message": "names a harness tool; describe the action with a verb instead",
+      "scopes": ["skill", "doc"],
+      "skipInlineCode": false,
+      "flags": "",
+      "patterns": [
+        "\\b(?:Bash|Agent|Task|Skill|Read|Write|Edit|Grep|Glob|Shell) tool\\b",
+        "\\bTaskCreate\\b",
+        "\\bTaskUpdate\\b",
+        "\\bTaskList\\b",
+        "\\bTodoWrite\\b",
+        "\\bAskUserQuestion\\b",
+        "\\bWebFetch\\b",
+        "\\bWebSearch\\b",
+        "\\bNotebookEdit\\b",
+        "\\bToolSearch\\b",
+        "\\bSendMessage\\b",
+        "\\bExitPlanMode\\b",
+        "\\bapply_patch\\b",
+        "\\bupdate_plan\\b",
+        "\\bmcp__\\w+"
+      ]
+    },
+    {
+      "rule": "model-name",
+      "message": "names a model family or ID; skills must not depend on a model",
+      "scopes": ["skill"],
+      "skipInlineCode": false,
+      "flags": "",
+      "patterns": [
+        "\\b(?:Claude|Opus|Sonnet|Haiku|Fable|GPT|ChatGPT|Gemini|Gemma|Llama|Mistral|Mixtral|Codestral|Qwen|DeepSeek|Grok|Phi-\\d)\\b",
+        "\\bclaude-[a-z0-9][a-z0-9.-]*",
+        "\\bgpt-\\d[\\w.-]*",
+        "\\bo[1-9](?:-mini|-pro|-preview)?\\b",
+        "\\bgemini-\\d[\\w.-]*",
+        "\\bllama-?\\d[\\w.-]*",
+        "\\bjev-[\\w.-]+"
+      ]
+    },
+    {
+      "rule": "vendor-name",
+      "message": "names a vendor or service; describe it by category with a fallback",
+      "scopes": ["skill"],
+      "skipInlineCode": false,
+      "flags": "i",
+      "patterns": [
+        "\\bAnthropic\\b",
+        "\\bOpenAI\\b",
+        "\\bGoogle\\b",
+        "\\bMicrosoft\\b",
+        "\\bAmazon\\b",
+        "\\bAWS\\b",
+        "\\bAzure\\b",
+        "\\bMeta AI\\b",
+        "\\bxAI\\b",
+        "\\bGitHub\\b",
+        "\\bGitLab\\b",
+        "\\bBitbucket\\b",
+        "\\bAtlassian\\b",
+        "\\bJira\\b",
+        "\\bConfluence\\b",
+        "\\bLinear\\b(?= app| issue| ticket)",
+        "\\bSlack\\b",
+        "\\bFigma\\b",
+        "\\bVercel\\b",
+        "\\bNetlify\\b",
+        "\\bSentry\\b",
+        "\\bSonarQube\\b",
+        "\\bCodeRabbit\\b",
+        "\\bTypeSafe\\b",
+        "\\bJev\\b",
+        "\\bnpmjs\\b",
+        "\\bDropbox\\b"
+      ]
+    },
+    {
+      "rule": "time-word",
+      "message": "time-relative wording rots; state the fact without a time anchor",
+      "scopes": ["skill", "doc"],
+      "skipInlineCode": true,
+      "flags": "i",
+      "patterns": [
+        "\\bcurrently\\b",
+        "\\bnew\\b",
+        "\\blatest\\b",
+        "\\bmodern\\b",
+        "\\brecently\\b",
+        "\\brecent\\b",
+        "\\bnowadays\\b",
+        "\\bthese days\\b",
+        "\\bat the moment\\b",
+        "\\bas of now\\b",
+        "\\bstate[- ]of[- ]the[- ]art\\b",
+        "\\bcutting[- ]edge\\b"
+      ]
+    },
+    {
+      "rule": "absolute-date",
+      "message": "absolute dates belong in data files, not prose",
+      "scopes": ["skill", "doc"],
+      "skipInlineCode": true,
+      "flags": "i",
+      "patterns": [
+        "\\b(?:19|20)\\d{2}-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\\d|3[01]))?\\b",
+        "\\b(?:0?[1-9]|1[0-2])/(?:0?[1-9]|[12]\\d|3[01])/(?:19|20)?\\d{2}\\b",
+        "\\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\.? (?:\\d{1,2}(?:st|nd|rd|th)?,? )?(?:19|20)\\d{2}\\b",
+        "\\bQ[1-4] (?:19|20)\\d{2}\\b",
+        "\\b(?:in|since|as of|until|by|from) (?:19|20)\\d{2}\\b"
+      ]
+    },
+    {
+      "rule": "org-term",
+      "message": "names a person, org or private location; skills must work for any user",
+      "scopes": ["skill", "doc"],
+      "skipInlineCode": false,
+      "flags": "i",
+      "patterns": [
+        "\\bJason\\b",
+        "\\bFeatheringham\\b",
+        "\\bJawsomeJason\\b",
+        "\\bREDACTED\\b",
+        "jawsomejason\\.com",
+        "\\bREDACTED\\b",
+        "\\bREDACTED\\b",
+        "REDACTED\\b",
+        "\\bREDACTED\\b",
+        "/Users/[\\w.-]+",
+        "/home/[\\w.-]+",
+        "~/\\.claude\\b",
+        "\\bMEMORY\\.md\\b",
+        "\\bCLAUDE\\.local\\.md\\b",
+        "\\bauto-memory\\b",
+        "\\bREDACTED\\b",
+        "\\bGoogle Drive\\b"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "standards",
+  "description": "Mine a repo's review history into coding standards and the lenses that review against them",
+  "version": "0.1.0",
+  "author": {
+    "name": "Jason Featheringham",
+    "email": "jason@jawsomejason.com"
+  },
+  "license": "MIT"
+}
