@@ -27,7 +27,7 @@ Skills must keep working as harnesses, models, vendors and runtimes change aroun
 - **Vendors.** Name no vendor or hosted service. Describe an optional capability by category, such as a judgment model or a forge CLI, and give a fallback. `git` is the only hard dependency.
 - **Runtimes.** Scripts use the standard library only: no `package.json`, no lockfile, no install step. Each script's output follows a schema in `references/schemas/`, so an agent can write the same file by hand when the script fails.
 - **Links.** The only external URL a skill may carry is the spec. Examples live in `references/`, and every relative link stays inside its own skill folder.
-- **Time.** Prose carries no time-relative words and no absolute dates. Words like `currently`, `latest` and `new` go stale. Dates belong in data files.
+- **Time.** Prose carries no time-relative words and no absolute dates. Words like `currently`, `latest` and `recently` go stale. Dates belong in data files.
 - **Reasons.** Every rule states why it exists. A rule with its reason still generalizes after the tools change.
 - **Identity.** No person, company, domain or private path appears anywhere. Skills work for any user at any company.
 

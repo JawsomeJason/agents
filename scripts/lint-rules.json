@@ -94,7 +94,6 @@
       "flags": "i",
       "patterns": [
         "\\bcurrently\\b",
-        "\\bnew\\b",
         "\\blatest\\b",
         "\\bmodern\\b",
         "\\brecently\\b",
