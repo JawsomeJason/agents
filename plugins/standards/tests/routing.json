@@ -1,6 +1,6 @@
 {
   "skill": "standards",
-  "how_to_score": "Give a fresh agent only SKILL.md and one request at a time. The agent passes a case when it picks the expected command, shows the menu for expect menu without running anything, or asks exactly one question naming every listed option for expect ask.",
+  "how_to_score": "Give a fresh agent only SKILL.md, the context, and one request at a time. The agent passes a case when it picks the expected command, shows the menu for expect menu without running anything, asks exactly one question naming every listed option for expect ask, or for expect error and expect no-match runs nothing, says why, and lists every area in the context.",
   "cases": [
     {
       "id": "bare",
@@ -59,15 +59,64 @@
       "id": "ambiguous-clean-up",
       "request": "Clean up our standards.",
       "expect": "ask",
-      "options": ["prune", "doctor"],
+      "options": [
+        "prune",
+        "doctor"
+      ],
       "why": "Cleaning up could mean deleting rules agents already follow, or finding rules that drifted from the code."
     },
     {
       "id": "ambiguous-still-good",
       "request": "Are our standards still any good?",
       "expect": "ask",
-      "options": ["doctor", "prune"],
+      "options": [
+        "doctor",
+        "prune"
+      ],
       "why": "Still good could mean still matching the code, or still needed by agents."
+    },
+    {
+      "id": "scope-path-only",
+      "request": "/standards src/api/",
+      "expect": "review",
+      "why": "A scope with no command means review of that scope, which only reads."
+    },
+    {
+      "id": "scope-section-only",
+      "request": "/standards §1",
+      "expect": "review",
+      "why": "A § with no command is a scope, so it routes to review of that area's lenses."
+    },
+    {
+      "id": "review-rule",
+      "request": "/standards review §2.3",
+      "expect": "review",
+      "why": "Review accepts a §, which applies only that lens."
+    },
+    {
+      "id": "prune-area",
+      "request": "/standards prune error-handling",
+      "expect": "prune",
+      "why": "Prune accepts an area and tests only its rules."
+    },
+    {
+      "id": "write-area",
+      "request": "/standards write testing",
+      "expect": "write",
+      "why": "Write accepts an area and refreshes only it."
+    },
+    {
+      "id": "mine-area",
+      "request": "/standards mine data-access",
+      "expect": "error",
+      "why": "Mine takes only a path or glob, because areas don't exist before write. The reply says so and lists the areas."
+    },
+    {
+      "id": "unknown-scope",
+      "request": "/standards billing/",
+      "expect": "no-match",
+      "why": "billing/ is no §, no area slug and no tracked path, so the reply says it matched nothing, lists the areas and stops."
     }
-  ]
+  ],
+  "context": "Generated standards exist. Their index has three areas: §1 data-access (rules §1.1 to §1.3), §2 error-handling (rules §2.1 to §2.4) and §3 testing (rules §3.1 and §3.2). The repo tracks files under src/api/ and src/jobs/, and nothing under billing/."
 }
