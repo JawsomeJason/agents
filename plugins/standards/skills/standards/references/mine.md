@@ -12,6 +12,9 @@ Output `.standards/reviews.jsonl`, one comment per line, per [the reviews schema
 
 Script: `node <skill-dir>/scripts/fetch-reviews.mjs --out .standards/reviews.jsonl`. It finds the forge's CLI, such as `gh` or `glab`, and falls back to `git log` when no forge answers.
 
+- `--limit <n>` reads only the newest `n` merged changes, or the newest `n` review-fix commits under `git log`. Use it for a quick trial on a large repo.
+- Each finished change is saved under `.standards/reviews.jsonl.cache/`, so a rerun after a failure skips the changes already read. `--refresh` ignores that cache and fetches everything again.
+
 By hand:
 
 1. Check for the forge's CLI and run its auth status command. A CLI that is missing or signed out counts as no forge.
@@ -23,7 +26,7 @@ Done when every merged change the forge lists, or every commit on the default br
 
 ## Step 2. Draft the label set
 
-Output `.standards/labels.json`, a JSON array of `{ "id": "kebab-case-slug", "description": "One sentence naming the convention." }`. `scripts/questions.mjs` reads it.
+Output `.standards/labels.json`, a JSON array of `{ "id": "kebab-case-slug", "description": "One sentence naming the convention." }`, per [the labels schema](schemas/questions.labels.schema.json). Ids are unique, and `none` is reserved. `scripts/questions.mjs` and `scripts/cluster.mjs` read it.
 
 1. Drop bot comments. They repeat rules their tool already enforces, so they add no convention a person had to defend.
 2. Read at least 100 human comments, or all of them when there are fewer. Spread the sample across the history and across directories, so one busy area does not set the labels.
@@ -61,7 +64,7 @@ A judgment model is a fast model that answers typed questions (pick one of a set
 
 Then check the answers.
 
-Script: `node <skill-dir>/scripts/questions.mjs check --questions .standards/questions.jsonl --answers .standards/answers.jsonl`. It lists questions with no answer and answers with `confidence` under 0.6.
+Script: `node <skill-dir>/scripts/questions.mjs check --questions .standards/questions.jsonl --answers .standards/answers.jsonl`. It lists questions with no answer and answers with `confidence` under 0.6. It also lists answers to unknown questions, second answers to one question, and answers that are not one of the question's options or levels, and it exits non-zero while anything is listed.
 
 By hand, join the two files on question id with a short script and list the same two sets. Counting by eye misses gaps in a file this size.
 
