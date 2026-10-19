@@ -44,4 +44,6 @@ node --test 'scripts/*.test.mjs'     # the lint's own tests
 
 Errors print as `file:line rule message`, and the lint exits non-zero when it finds any. Every check has a violating fixture in `scripts/lint-fixtures/`, and `scripts/lint.test.mjs` proves each fixture fails its rule and the clean fixture passes. Add a fixture and a test with every check you add.
 
+Run `node scripts/test-harnesses.mjs` before each release. It runs the skills in every installed harness, which needs each harness's login, so CI can't run it.
+
 CI runs the lint and its tests on every push, every pull request and once a month, so rot shows even when nobody pushes. Pin each action by full commit SHA.
