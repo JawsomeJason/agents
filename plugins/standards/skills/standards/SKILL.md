@@ -30,7 +30,7 @@ Reviewers enforce the same conventions by hand, comment after comment. This skil
 
 ## Routing
 
-Invoke as `standards [command] [scope]`. A scope is a path or glob, an area slug from the generated index, or a § number (`§2`, `§2.3`). Resolve it per [references/scope.md](references/scope.md).
+Invoke as `standards [command] [scope]`. A scope is a path or glob, an area slug from the generated index, or a § number (`§2`, `§2.3`). Resolve it per [references/scope.md](references/scope.md). `mine` takes only a path, because areas exist only after `write`.
 
 - **No argument.** Show the menu below and wait for a choice. Never auto-run a command, because each one reads history, edits the repo or spends many agent runs.
 - **A scope with no command.** Run `review` of that scope without asking, because `review` only reads.
