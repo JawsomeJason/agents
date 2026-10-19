@@ -1,0 +1,73 @@
+{
+  "skill": "standards",
+  "how_to_score": "Give a fresh agent only SKILL.md and one request at a time. The agent passes a case when it picks the expected command, shows the menu for expect menu without running anything, or asks exactly one question naming every listed option for expect ask.",
+  "cases": [
+    {
+      "id": "bare",
+      "request": "/standards",
+      "expect": "menu",
+      "why": "No argument, so the menu shows and nothing runs."
+    },
+    {
+      "id": "mine-explicit",
+      "request": "Go through the review comments on our merged PRs and tell me which conventions reviewers keep asking for.",
+      "expect": "mine"
+    },
+    {
+      "id": "mine-from-nothing",
+      "request": "We have no coding standards. Build some for this repo from its review history.",
+      "expect": "mine",
+      "why": "Standards from nothing start at mine, because write needs clusters.json."
+    },
+    {
+      "id": "write-from-clusters",
+      "request": "clusters.json is done. Turn the top conventions into standards in the repo.",
+      "expect": "write"
+    },
+    {
+      "id": "write-shape-b",
+      "request": "Generate the standards as one skill per area instead of a single index.",
+      "expect": "write",
+      "why": "Output shape B is a write option."
+    },
+    {
+      "id": "review-branch",
+      "request": "Check my branch against our coding standards before I open the pull request.",
+      "expect": "review"
+    },
+    {
+      "id": "review-pr",
+      "request": "Does PR 482 break any of our § rules?",
+      "expect": "review"
+    },
+    {
+      "id": "prune-explicit",
+      "request": "Which of our standards would agents follow anyway without being told? Cut those out.",
+      "expect": "prune"
+    },
+    {
+      "id": "prune-ab",
+      "request": "A/B test whether the rule about mapping documents to DTOs still changes what agents write.",
+      "expect": "prune"
+    },
+    {
+      "id": "doctor-drift",
+      "request": "Half the files our standards cite got moved in the refactor. Which rules are pointing at nothing?",
+      "expect": "doctor"
+    },
+    {
+      "id": "ambiguous-clean-up",
+      "request": "Clean up our standards.",
+      "expect": "ask",
+      "options": ["prune", "doctor"],
+      "why": "Cleaning up could mean deleting rules agents already follow, or finding rules that drifted from the code."
+    },
+    {
+      "id": "ambiguous-still-good",
+      "request": "Are our standards still any good?",
+      "expect": "ask",
+      "options": ["doctor", "prune"],
+      "why": "Still good could mean still matching the code, or still needed by agents."
+    }
+  ]
+}
