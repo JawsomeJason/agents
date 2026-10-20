@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { FetchError, fetchReviews, parseRemote } from '../skills/standards/scripts/fetch-reviews.mjs';
-import { failed, fakeRunner, gitRepo, readJsonl, runNode, tempDir } from './helpers.mjs';
+import { failed, fakeRunner, git, gitRepo, readJsonl, runNode, scriptPath, tempDir } from './helpers.mjs';
 import { loadSchema, validate } from './schema.mjs';
 
 const GH = JSON.parse(readFileSync(new URL('./fixtures/gh-api.json', import.meta.url), 'utf8'));
@@ -184,7 +184,7 @@ test('git log fallback: keeps only commits that address review feedback', () => 
     records.map((x) => [x.kind, x.change, x.path, x.body.split('\n')[0]]),
     [
       ['commit', '12', 'parse.js', 'Address review comments (#12)'],
-      ['commit', null, null, 'per review: split helpers'],
+      ['commit', records[1].commit.slice(0, 12), null, 'per review: split helpers'],
     ],
   );
   assert.match(records[0].diff_hunk, /\+export const parseInput = 1;/);
@@ -214,4 +214,27 @@ test('cli: expected failures print one clear line and no stack trace', () => {
     assert.match(r.stderr, message);
     assert.doesNotMatch(r.stderr, /\n\s+at /);
   }
+});
+
+test('with no forge, review-fix commits each count as a change and their authors as the reviewer basis, so a convention survives clustering', async () => {
+  const { fetchReviews } = await import(scriptPath('fetch-reviews.mjs'));
+  const { ask } = await import(scriptPath('questions.mjs'));
+  const { cluster } = await import(scriptPath('cluster.mjs'));
+  const dir = tempDir();
+  git(dir, ['init', '-q', '-b', 'main']);
+  ['Ann', 'Bob', 'Cy', 'Ann', 'Bob'].forEach((name, i) => {
+    writeFileSync(join(dir, `f${i}.go`), `x${i}\n`);
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '-q', '-m', `Address review: wrap errors with context ${i}`], { GIT_AUTHOR_NAME: name, GIT_AUTHOR_EMAIL: `${name}@example.com` });
+  });
+  const r = fetchReviews({ cwd: dir, out: join(dir, '.standards/reviews.jsonl') });
+  assert.equal(r.via, 'git-log');
+  assert.equal(new Set(r.records.map((x) => x.change)).size, 5);
+  assert.ok(r.records.every((x) => /^[0-9a-f]{12}$/.test(x.change)));
+  const labels = [{ id: 'wrap-errors', description: 'Wrap errors with context.' }];
+  const questions = ask(r.records, labels);
+  const answers = questions.map((q) => ({ question_id: q.id, answer: q.topic === 'label' ? 'wrap-errors' : 'major', confidence: 0.9, answered_by: 'agent' }));
+  const { result } = cluster({ reviews: r.records, questions, answers, labels });
+  assert.deepEqual(result.clusters.map((c) => [c.label, c.changes.length, c.reviewers.length]), [['wrap-errors', 5, 3]]);
+  assert.equal(result.reviewer_basis, 'commit-author');
 });

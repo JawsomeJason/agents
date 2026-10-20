@@ -110,6 +110,8 @@ export function cluster({ reviews, questions, answers, labels }) {
     result: {
       inputs: { reviews: reviews.length, human_reviews: human.length, conventions: kept, answered_by: answeredBy },
       min_count: MIN_COUNT,
+      // Under git log, a record's author is whoever committed the fix, not the reviewer who asked for it.
+      reviewer_basis: human.some((r) => r.source === 'git-log') ? 'commit-author' : 'reviewer',
       severity_weights: SEVERITY_WEIGHTS,
       clusters: clusters.map((c, i) => ({ rank: i + 1, ...c })),
       dropped,

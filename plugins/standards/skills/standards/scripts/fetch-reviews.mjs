@@ -223,7 +223,8 @@ function fromGitLog(run, cwd, { limit }) {
       id: `git-log:${sha}`,
       source: 'git-log',
       kind: 'commit',
-      change: change ? (change[1] ?? change[2]) : null,
+      // A commit with no change number in its title is its own change, so clusters can still count distinct changes.
+      change: change ? (change[1] ?? change[2]) : sha.slice(0, 12),
       change_author: null,
       author: author || 'unknown',
       author_is_bot: isBotLogin(author),
@@ -241,10 +242,12 @@ function fromGitLog(run, cwd, { limit }) {
   return { records, changes: records.length, scanned };
 }
 
+// Numbered changes sort by number, then commit-hash changes by text, then records with no change.
 function byChangeThenTime(a, b) {
-  const ca = a.change === null ? Infinity : Number(a.change);
-  const cb = b.change === null ? Infinity : Number(b.change);
-  if (ca !== cb) return ca - cb;
+  const rank = (c) => (c === null ? 2 : /^\d+$/.test(c) ? 0 : 1);
+  if (rank(a.change) !== rank(b.change)) return rank(a.change) - rank(b.change);
+  if (rank(a.change) === 0 && a.change !== b.change) return Number(a.change) - Number(b.change);
+  if (rank(a.change) === 1 && a.change !== b.change) return a.change < b.change ? -1 : 1;
   if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }

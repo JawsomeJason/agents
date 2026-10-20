@@ -21,7 +21,7 @@
     },
     "change": {
       "type": ["string", "null"],
-      "description": "The pull or merge request number the comment belongs to, as a string. null for commit records with no known change."
+      "description": "The pull or merge request number the comment belongs to, as a string. A git log commit with no number in its title is its own change, named by the first 12 characters of its hash."
     },
     "change_author": {
       "type": ["string", "null"],

@@ -23,7 +23,7 @@ By hand:
 
 1. Check for the forge's CLI and run its auth status command. A CLI that is missing or signed out counts as no forge.
 2. With a forge, list every merged pull or merge request. For each one, fetch its inline review comments, its review bodies and its thread replies. Page through every result, because the first page holds only a slice of the history.
-3. With no forge, run `git log` over the default branch with full messages. Keep each commit whose message says it addresses review feedback, such as "address review", "per review" or "review fixes". Record it as kind `commit`, with the commit's diff as `diff_hunk`. This finds fewer conventions than a forge, so say so in the report.
+3. With no forge, run `git log` over the default branch with full messages. Keep each commit whose message says it addresses review feedback, such as "address review", "per review" or "review fixes". Record it as kind `commit`, with the commit's diff as `diff_hunk`, and as `change` the change number in its title or else its short hash, so each commit counts as one change. The log names who fixed the code, not who reviewed it, so the reviewer floor in step 5 counts commit authors instead; `clusters.json` says so with `reviewer_basis: commit-author`. This finds fewer conventions than a forge, so say so in the report.
 4. Write one JSON object per line. Set `author_is_bot` for apps and bot accounts, and `change_author` to the login that opened the change.
 
 Done when every merged change the forge lists, or every commit on the default branch, has been read, and every line validates against the schema. Report the counts of comments, changes and bot comments.

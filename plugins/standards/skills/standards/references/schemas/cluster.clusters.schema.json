@@ -26,6 +26,10 @@
         }
       }
     },
+    "reviewer_basis": {
+      "enum": ["reviewer", "commit-author"],
+      "description": "What the reviewers count stands for. reviewer: the comment authors from a forge. commit-author: under the git log fallback, the people who committed review fixes, who stand in for the reviewers the log does not name."
+    },
     "min_count": {
       "type": "object",
       "additionalProperties": false,
