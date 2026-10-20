@@ -70,6 +70,9 @@ export function readLabels(file) {
   return labels;
 }
 
+// A change's author answering review states no convention a reviewer enforced.
+export const isReviewerComment = (r) => !r.author_is_bot && !(r.change_author && r.author === r.change_author);
+
 function stateOf(review) {
   const parts = [`Comment:\n${review.body}`];
   if (review.path) parts.push(`Path: ${review.path}`);
@@ -84,7 +87,7 @@ export function ask(reviews, labels) {
   for (const review of reviews) {
     if (seen.has(review.id)) throw new UsageError(`duplicate review id ${review.id}`);
     seen.add(review.id);
-    if (review.author_is_bot) continue;
+    if (!isReviewerComment(review)) continue;
     const state = stateOf(review);
     const q = (topic, kind, extra) => ({ id: `${review.id}#${topic}`, review_id: review.id, topic, kind, prompt: PROMPTS[topic], state, ...extra });
     questions.push(q('convention', 'yesno'), q('label', 'choice', { options }), q('severity', 'score', { levels: SEVERITY_LEVELS }));
@@ -159,7 +162,7 @@ function main(argv) {
     const reviews = readJsonl(values.reviews, 'reviews');
     const questions = ask(reviews, readLabels(values.labels));
     writeAtomic(values.out, questions.map((q) => JSON.stringify(q)).join('\n') + (questions.length ? '\n' : ''));
-    console.log(`${questions.length} questions for ${questions.length / 3} human comments (${reviews.length} reviews read); wrote ${values.out}`);
+    console.log(`${questions.length} questions for ${questions.length / 3} reviewer comments (${reviews.length} reviews read); wrote ${values.out}`);
     return 0;
   }
   if (command === 'check') {

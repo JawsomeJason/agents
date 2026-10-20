@@ -12,7 +12,7 @@
       "required": ["reviews", "human_reviews", "conventions", "answered_by"],
       "properties": {
         "reviews": { "type": "integer", "minimum": 0, "description": "Lines in reviews.jsonl." },
-        "human_reviews": { "type": "integer", "minimum": 0, "description": "Lines with author_is_bot false. Only these get questions." },
+        "human_reviews": { "type": "integer", "minimum": 0, "description": "Lines from reviewers: author_is_bot false and author not the change_author. Only these get questions." },
         "conventions": { "type": "integer", "minimum": 0, "description": "Comments that passed the convention threshold and carry a label other than none." },
         "answered_by": {
           "type": "object",

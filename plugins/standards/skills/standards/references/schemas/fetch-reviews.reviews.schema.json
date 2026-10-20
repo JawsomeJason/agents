@@ -23,6 +23,10 @@
       "type": ["string", "null"],
       "description": "The pull or merge request number the comment belongs to, as a string. null for commit records with no known change."
     },
+    "change_author": {
+      "type": ["string", "null"],
+      "description": "The login of the change's author, when the forge gives one. Comments by this login are the author answering review, not a reviewer enforcing a convention, so questions.mjs skips them. null for git-log records."
+    },
     "author": {
       "type": "string",
       "minLength": 1,

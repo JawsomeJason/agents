@@ -24,7 +24,7 @@ By hand:
 1. Check for the forge's CLI and run its auth status command. A CLI that is missing or signed out counts as no forge.
 2. With a forge, list every merged pull or merge request. For each one, fetch its inline review comments, its review bodies and its thread replies. Page through every result, because the first page holds only a slice of the history.
 3. With no forge, run `git log` over the default branch with full messages. Keep each commit whose message says it addresses review feedback, such as "address review", "per review" or "review fixes". Record it as kind `commit`, with the commit's diff as `diff_hunk`. This finds fewer conventions than a forge, so say so in the report.
-4. Write one JSON object per line. Set `author_is_bot` for apps and bot accounts.
+4. Write one JSON object per line. Set `author_is_bot` for apps and bot accounts, and `change_author` to the login that opened the change.
 
 Done when every merged change the forge lists, or every commit on the default branch, has been read, and every line validates against the schema. Report the counts of comments, changes and bot comments.
 
@@ -32,8 +32,8 @@ Done when every merged change the forge lists, or every commit on the default br
 
 Output `.standards/labels.json`, a JSON array of `{ "id": "kebab-case-slug", "description": "One sentence naming the convention." }`, per [the labels schema](schemas/questions.labels.schema.json). Ids are unique, and `none` is reserved. `scripts/questions.mjs` and `scripts/cluster.mjs` read it.
 
-1. Drop bot comments. They repeat rules their tool already enforces, so they add no convention a person had to defend.
-2. Read at least 100 human comments, or all of them when there are fewer. Spread the sample across the history and across directories, so one busy area does not set the labels.
+1. Drop bot comments, and comments by the change's own author. Bots repeat rules their tool already enforces, and an author answering review states no convention a reviewer defended.
+2. Read at least 100 reviewer comments, or all of them when there are fewer. Spread the sample across the history and across directories, so one busy area does not set the labels.
 3. Name each distinct convention the reviewers ask for, at the level one rule could state. "Map database documents to DTOs before they leave a handler" is the right level. "Naming" is too broad to act on, and "rename this variable" is one site.
 4. Merge labels that a single rule would cover. Aim for 10 to 40 labels. Too broad, and a cluster holds conventions no single rule states. Too narrow, and one convention splits into clusters under the minimum count of 3.
 
@@ -45,7 +45,7 @@ Output `.standards/questions.jsonl`, per [the questions schema](schemas/question
 
 Script: `node <skill-dir>/scripts/questions.mjs ask --reviews .standards/reviews.jsonl --labels .standards/labels.json --out .standards/questions.jsonl`.
 
-By hand, write three questions for every human comment. Each one's `state` holds the comment body, its path, and its diff hunk when present.
+By hand, write three questions for every reviewer comment: human, and not by the change's author. Each one's `state` holds the comment body, its path, and its diff hunk when present.
 
 | Topic | Kind | Prompt |
 | --- | --- | --- |
@@ -53,7 +53,7 @@ By hand, write three questions for every human comment. Each one's `state` holds
 | `label` | `choice` | Which convention does this review comment enforce? Options are every label id plus `none`. |
 | `severity` | `score` | How much harm would ignoring this comment cause? Levels are `nit`, `minor`, `major`, `blocker`. |
 
-Done when every human comment has exactly three questions.
+Done when every reviewer comment has exactly three questions.
 
 ## Step 4. Answer the questions
 
@@ -91,10 +91,10 @@ By hand, write a short script that does each of these, because the counts decide
 5. Set `score` to count times severity. Sort by score, highest first, and number `rank` from 1.
 6. For each cluster, list every review id, change and path, and pick up to 5 examples that state the convention most plainly.
 
-Done when `clusters.json` validates and its counts reconcile. Every human comment lands in exactly one group: under the convention threshold, labeled `none`, or kept. The three counts sum to the human comment count.
+Done when `clusters.json` validates and its counts reconcile. Every reviewer comment lands in exactly one group: under the convention threshold, labeled `none`, or kept. The three counts sum to the reviewer comment count.
 
 ## Step 6. Report
 
-Show the clusters as a table: rank, label, count, severity, score. Give the number of dropped clusters and the human comment count. Say whether a forge or `git log` supplied the comments, and how many answers came from a judgment model.
+Show the clusters as a table: rank, label, count, severity, score. Give the number of dropped clusters and the reviewer comment count. Say whether a forge or `git log` supplied the comments, and how many answers came from a judgment model.
 
 Offer `write` as the next command, and stop. `write` edits the repo, so the user decides when it runs.

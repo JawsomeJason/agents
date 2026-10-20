@@ -61,7 +61,7 @@ test('ranks by count times severity, drops clusters under 3, and validates', () 
   const dir = setup();
   const r = runNode('cluster.mjs', args, dir);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /12 human comments = 1 under the convention threshold \+ 1 labeled none \+ 10 kept/);
+  assert.match(r.stdout, /12 reviewer comments = 1 under the convention threshold \+ 1 labeled none \+ 10 kept/);
   const out = JSON.parse(readFileSync(join(dir, 'out/clusters.json'), 'utf8'));
   assert.deepEqual(validate(loadSchema('cluster.clusters'), out), []);
   assert.deepEqual(out.inputs, { reviews: 13, human_reviews: 12, conventions: 10, answered_by: { 'judgment-model': 24, agent: 12, human: 0 } });

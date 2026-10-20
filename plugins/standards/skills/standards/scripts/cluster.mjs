@@ -3,7 +3,7 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { UsageError, check, readJsonl, readLabels } from './questions.mjs';
+import { UsageError, check, isReviewerComment, readJsonl, readLabels } from './questions.mjs';
 
 const USAGE =
   'usage: cluster.mjs --reviews <reviews.jsonl> --questions <questions.jsonl> --answers <answers.jsonl> --labels <labels.json> --out <clusters.json>';
@@ -41,7 +41,7 @@ export function cluster({ reviews, questions, answers, labels }) {
   const labelById = new Map(labels.map((l) => [l.id, l]));
   const answer = (review, topic) => answered.get(`${review.id}#${topic}`);
 
-  const human = reviews.filter((r) => !r.author_is_bot);
+  const human = reviews.filter(isReviewerComment);
   const groups = new Map(labels.map((l) => [l.id, []]));
   let below = 0;
   let none = 0;
@@ -56,7 +56,7 @@ export function cluster({ reviews, questions, answers, labels }) {
     }
   }
   const kept = [...groups.values()].reduce((n, g) => n + g.length, 0);
-  if (below + none + kept !== human.length) throw new Error('cluster counts do not reconcile with human comments');
+  if (below + none + kept !== human.length) throw new Error('cluster counts do not reconcile with reviewer comments');
 
   const clusters = [];
   const dropped = [];
@@ -129,7 +129,7 @@ function main(argv) {
   renameSync(tmp, values.out);
   console.log(
     `${result.clusters.length} clusters kept, ${result.dropped.length} dropped. ` +
-      `${tally.human} human comments = ${tally.below} under the convention threshold + ${tally.none} labeled none + ${tally.kept} kept`,
+      `${tally.human} reviewer comments = ${tally.below} under the convention threshold + ${tally.none} labeled none + ${tally.kept} kept`,
   );
   console.log(`wrote ${values.out}`);
 }

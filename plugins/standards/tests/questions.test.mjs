@@ -29,6 +29,7 @@ function setup() {
   writeJsonl(join(dir, 'reviews.jsonl'), [
     review('forge:1'),
     review('forge:2', { author: 'ci[bot]', author_is_bot: true }),
+    review('forge:3', { author: 'dev', change_author: 'dev', kind: 'thread-reply', body: 'Done.' }),
     review('git-log:abc1234', { source: 'git-log', kind: 'commit', path: null, body: 'Address review' }),
   ]);
   writeFileSync(join(dir, 'labels.json'), JSON.stringify(LABELS));
@@ -37,7 +38,7 @@ function setup() {
 
 const askArgs = ['ask', '--reviews', 'reviews.jsonl', '--labels', 'labels.json', '--out', 'questions.jsonl'];
 
-test('ask writes three valid questions per human comment and skips bots', () => {
+test('ask writes three valid questions per reviewer comment and skips bots and the change author', () => {
   const dir = setup();
   const r = runNode('questions.mjs', askArgs, dir);
   assert.equal(r.status, 0, r.stderr);

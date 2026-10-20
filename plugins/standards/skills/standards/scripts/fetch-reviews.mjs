@@ -101,7 +101,7 @@ function cached(dir, change, refresh, load) {
   return records;
 }
 
-function githubRecords(run, forge, change, perPage) {
+function githubRecords(run, forge, change, perPage, changeAuthor) {
   const base = `repos/${forge.path}/pulls/${change}`;
   const records = [];
   for (const c of pages(run, forge, `${base}/comments`, perPage)) {
@@ -112,6 +112,7 @@ function githubRecords(run, forge, change, perPage) {
       source: 'forge',
       kind: c.in_reply_to_id ? 'thread-reply' : 'inline-comment',
       change,
+      change_author: changeAuthor,
       author,
       author_is_bot: c.user?.type === 'Bot' || isBotLogin(author),
       created_at: c.created_at,
@@ -134,6 +135,7 @@ function githubRecords(run, forge, change, perPage) {
       source: 'forge',
       kind: 'review-body',
       change,
+      change_author: changeAuthor,
       author,
       author_is_bot: r.user?.type === 'Bot' || isBotLogin(author),
       created_at: r.submitted_at,
@@ -149,7 +151,7 @@ function githubRecords(run, forge, change, perPage) {
   return records;
 }
 
-function gitlabRecords(run, forge, change, perPage, webUrl) {
+function gitlabRecords(run, forge, change, perPage, webUrl, changeAuthor) {
   const base = `projects/${encodeURIComponent(forge.path)}/merge_requests/${change}/discussions`;
   const records = [];
   for (const discussion of pages(run, forge, base, perPage)) {
@@ -161,6 +163,7 @@ function gitlabRecords(run, forge, change, perPage, webUrl) {
         source: 'forge',
         kind: i > 0 ? 'thread-reply' : n.position ? 'inline-comment' : 'review-body',
         change,
+        change_author: changeAuthor,
         author,
         author_is_bot: n.author?.bot === true || isBotLogin(author),
         created_at: n.created_at,
@@ -185,13 +188,16 @@ function fromForge(run, forge, { limit, refresh, perPage, cacheRoot }) {
   const changes = [];
   for (const item of pages(run, forge, listPath, perPage)) {
     if (github && !item.merged_at) continue;
-    changes.push({ number: String(github ? item.number : item.iid), webUrl: item.web_url });
+    const changeAuthor = (github ? item.user?.login : item.author?.username) ?? null;
+    changes.push({ number: String(github ? item.number : item.iid), webUrl: item.web_url, changeAuthor });
     if (limit && changes.length >= limit) break;
   }
   const cacheDir = join(cacheRoot, `${forge.cli}-${forge.host}-${forge.path.replaceAll('/', '_')}`);
-  const records = changes.flatMap(({ number, webUrl }) =>
+  const records = changes.flatMap(({ number, webUrl, changeAuthor }) =>
     cached(cacheDir, number, refresh, () =>
-      github ? githubRecords(run, forge, number, perPage) : gitlabRecords(run, forge, number, perPage, webUrl),
+      github
+        ? githubRecords(run, forge, number, perPage, changeAuthor)
+        : gitlabRecords(run, forge, number, perPage, webUrl, changeAuthor),
     ),
   );
   return { records, changes: changes.length };
@@ -218,6 +224,7 @@ function fromGitLog(run, cwd, { limit }) {
       source: 'git-log',
       kind: 'commit',
       change: change ? (change[1] ?? change[2]) : null,
+      change_author: null,
       author: author || 'unknown',
       author_is_bot: isBotLogin(author),
       created_at: date,

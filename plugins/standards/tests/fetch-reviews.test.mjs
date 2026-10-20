@@ -55,6 +55,16 @@ test('gh: records the commit and line the reviewer saw, not where a later push m
   assert.deepEqual([first.commit, first.line], ['aaaaaaa', 15]);
 });
 
+test('gh: records the change author on every comment', () => {
+  const responses = structuredClone(GH);
+  responses['repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=6'][1].user = { login: 'shadowspawn' };
+  const out = join(tempDir(), 'reviews.jsonl');
+  fetchReviews({ cwd: repo(), out, limit: 3, perPage: 2, run: fakeRunner({ responses, cli: { gh: 'ok' } }) });
+  const records = readJsonl(out);
+  assertValid(records);
+  assert.deepEqual([...new Set(records.map((x) => x.change_author))], ['shadowspawn']);
+});
+
 test('gh: --limit stops at that many merged changes', () => {
   const out = join(tempDir(), 'reviews.jsonl');
   const r = fetchGh(repo(), out, { limit: 1 });
