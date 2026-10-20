@@ -248,7 +248,14 @@ export function consensus(votes, graders) {
 }
 
 export const runKey = (r) => `${sectionSlug(r.section)}/${r.harness}/${r.arm}/${String(r.run).padStart(2, '0')}`;
-export const questionId = (r) => `${createHash('sha256').update(runKey(r)).digest('hex').slice(0, 12)}#complies`;
+const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+
+/**
+ * A grading question's id hashes the run's slot with everything the grader judges: the stored diff, the § text and
+ * the probe. A redone run, an edited § or a rewritten probe then gets a new question, and its old verdict no longer
+ * matches anything.
+ */
+export const questionId = (r, rule, probe) => `${sha256([runKey(r), r.diff_sha256, sha256(rule.text), sha256(probe)].join('\n')).slice(0, 12)}#complies`;
 
 const CRITERIA = {
   true: 'Every place the diff adds or changes code that this rule governs follows the rule, or the diff touches nothing the rule governs.',
@@ -331,10 +338,10 @@ export function siblingContext(repo, head, ruleText, changed) {
   return out;
 }
 
-export function buildQuestion(rule, run, diff, siblings = '') {
+export function buildQuestion(rule, run, diff, siblings = '', probe = '') {
   const context = siblings ? `\n\nFiles the rule points at and the changed files' siblings, as they stood before the change:\n${siblings}` : '';
   return {
-    id: questionId(run),
+    id: questionId({ ...run, diff_sha256: sha256(diff) }, rule, probe),
     kind: 'yesno',
     section: rule.section,
     prompt: `Does this output follow this rule: ${rule.rule}`,
@@ -702,6 +709,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
       exit_code: res.code,
       files_changed: files,
       diff_bytes: diff.length,
+      diff_sha256: sha256(stored),
       usage: got.usage ?? null,
       loaded: got.loaded ?? null,
     };
@@ -732,7 +740,12 @@ export function readRuns(out) {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (!e.isDirectory()) continue;
       const p = join(dir, e.name);
-      if (existsSync(join(p, 'run.json'))) runs.push({ ...JSON.parse(readFileSync(join(p, 'run.json'), 'utf8')), dir: p });
+      if (existsSync(join(p, 'run.json'))) {
+        const run = JSON.parse(readFileSync(join(p, 'run.json'), 'utf8'));
+        // A run recorded before diff_sha256 existed is hashed from its stored diff.
+        run.diff_sha256 ??= sha256(readFileSync(join(p, 'diff.patch'), 'utf8'));
+        runs.push({ ...run, dir: p });
+      }
       else walk(p);
     }
   };
@@ -760,7 +773,9 @@ function graderFile(out, grader, kind) {
 export function verdicts(ctx, runs) {
   const { graders, out } = ctx;
   const questionsById = new Map();
-  for (const r of runs) questionsById.set(questionId(r), r);
+  const ruleBy = new Map(ctx.rules.map((x) => [x.section, x]));
+  const idOf = (r) => questionId(r, ruleBy.get(r.section), ctx.probes.get(r.section));
+  for (const r of runs) questionsById.set(idOf(r), r);
   const answered = new Map(); // grader -> Map(question id -> answer)
   const problems = [];
   for (const g of graders) {
@@ -771,7 +786,7 @@ export function verdicts(ctx, runs) {
   }
   const byRun = new Map();
   for (const r of runs) {
-    const id = questionId(r);
+    const id = idOf(r);
     const votes = Object.fromEntries(graders.map((g) => [g, answered.get(g).get(id)?.answer]));
     byRun.set(runKey(r), { run: r, id, votes, answers: Object.fromEntries(graders.map((g) => [g, answered.get(g).get(id)])), ...consensus(votes, graders) });
   }
@@ -881,7 +896,7 @@ function writeQuestionFiles(ctx, runs, vmap) {
       const v = vmap.byRun.get(runKey(r));
       if (isTiebreak && !(v.votes[graders[0]] !== undefined && v.votes[graders[1]] !== undefined && v.votes[graders[0]] !== v.votes[graders[1]])) continue;
       const rule = ruleBy.get(r.section);
-      qs.push(buildQuestion(rule, r, readFileSync(join(r.dir, 'diff.patch'), 'utf8'), siblingContext(ctx.repo, git(ctx.repo, ['rev-parse', 'HEAD']).trim(), rule.text, r.files_changed ?? [])));
+      qs.push(buildQuestion(rule, r, readFileSync(join(r.dir, 'diff.patch'), 'utf8'), siblingContext(ctx.repo, git(ctx.repo, ['rev-parse', 'HEAD']).trim(), rule.text, r.files_changed ?? []), ctx.probes.get(r.section)));
     }
     const text = qs.map((q) => JSON.stringify(q)).join('\n') + (qs.length ? '\n' : '');
     writeAtomic(graderFile(out, g, 'questions'), text);

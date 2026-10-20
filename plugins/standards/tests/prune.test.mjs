@@ -651,3 +651,24 @@ test('a run records what its session reported loading', async () => {
   assert.deepEqual(record.loaded, { skills: [], plugins: [], mcp_servers: [] });
   assert.deepEqual(validate(loadSchema('prune.run'), record), []);
 });
+
+test('a redone run, an edited § or a rewritten probe gets a new question id, so an old verdict never carries over', async () => {
+  const fx = fixture();
+  await step(context(fx, 'rule', { sections: ['§1.1'] }));
+  answerAll(fx, 'a');
+  answerAll(fx, 'b');
+  const before = prune.verdicts(context(fx, 'rule', { sections: ['§1.1'] }), readRuns(fx.out));
+  assert.equal([...before.byRun.values()].filter((v) => v.verdict !== null).length, 5);
+
+  const redone = readRuns(fx.out).find((r) => r.run === 1);
+  writeFileSync(join(redone.dir, 'diff.patch'), 'diff --git a/main.txt b/main.txt\n+OK-named\n');
+  const { dir, diff_sha256: _old, ...record } = redone;
+  writeFileSync(join(dir, 'run.json'), JSON.stringify(record));
+  const after = prune.verdicts(context(fx, 'rule', { sections: ['§1.1'] }), readRuns(fx.out));
+  assert.equal(after.byRun.get(prune.runKey(redone)).verdict, null, 'the redone run waits on a new answer');
+  assert.deepEqual(after.problems.map((p) => p.detail), ['answers no question in the questions file', 'answers no question in the questions file']);
+
+  writeFileSync(join(fx.standards, 'references/s1-1-names.md'), '# §1.1 Names\n\nName values for what they hold, always.\n');
+  const edited = prune.verdicts(context(fx, 'rule', { sections: ['§1.1'] }), readRuns(fx.out));
+  assert.equal([...edited.byRun.values()].filter((v) => v.verdict !== null).length, 0, 'an edited § re-asks every question');
+});

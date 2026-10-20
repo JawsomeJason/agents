@@ -19,6 +19,7 @@
     "exit_code": { "type": ["integer", "null"], "description": "The harness process's exit code." },
     "files_changed": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "Repo-relative paths the agent changed or added." },
     "diff_bytes": { "type": "integer", "minimum": 1, "description": "Size of the full diff before any cut." },
+    "diff_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of diff.patch as stored. The grading question's id hashes it with the run's slot, the § text and the probe, so a redone run gets a new question." },
     "usage": { "type": ["object", "null"], "description": "Token counts the harness reported, when it reports them. Data only." },
     "loaded": {
       "type": ["object", "null"],
