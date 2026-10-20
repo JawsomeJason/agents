@@ -55,7 +55,7 @@ A cluster is one label, not always one rule. Before numbering, read each kept cl
 - **Pool** evidence across clusters when comments under another label ask for the same rule. A labeler picks one label per comment, so a rule's evidence can sit in two clusters.
 - Each rule cites only the comments that ask for it, and each rule on its own needs comments from at least 3 distinct changes and 2 distinct reviewers, the same floor `mine` applies. A rule that falls under the floor after a split is left out and listed in the report as "too little evidence", because the floor is what keeps one reviewer's taste out of the standards.
 
-1. Group the `missing` and `thin` clusters into 3 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling.
+1. Group the rules that survive into 1 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling. Size the areas to the rules: a handful of rules may need only one or two areas, and an area of one rule is fine when no other rule shares its part of the code. Splitting few rules across many areas adds index headings, and in shape B whole descriptions, without helping an agent find a rule.
 2. Order the areas by their best cluster rank, and number them §1, §2 and on. Within an area, number rules by rank: §1.1, §1.2.
 3. When updating earlier standards, keep every existing number and append new rules at the end of their area. Review comments cite § numbers, and renumbering breaks those citations.
 4. Write each rule as one imperative sentence a person could follow without the § file.
