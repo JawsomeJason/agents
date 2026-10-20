@@ -780,3 +780,11 @@ test('an adapter that always runs one model records its runs as pinned, with the
   assert.deepEqual(validate(loadSchema('prune'), record), []);
   assert.match(prune.summaryTable(makeCtx(), record), /\nfake ran forced-model-1, pinned \(adapter default: test\), not its default\.\n$/);
 });
+
+test('a repo path holding a percent sign clones for the runs', async () => {
+  const fx = fixture();
+  const odd = join(fx.dir, 'repo%41 #x');
+  git(fx.dir, ['clone', '-q', fx.repo, odd]);
+  const r = await trial(context({ ...fx, repo: odd }, 'rule'), '§1.1', 'fake');
+  assert.ok(r.record, r.failed);
+});

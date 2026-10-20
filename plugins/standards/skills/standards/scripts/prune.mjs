@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { ignoreWorkDir } from './questions.mjs';
 
@@ -615,7 +615,7 @@ export function ensureBase(repo, out) {
   const head = git(repo, ['rev-parse', 'HEAD']).trim();
   if (!existsSync(join(base, '.git'))) {
     mkdirSync(dirname(base), { recursive: true });
-    git(dirname(base), ['clone', '-q', '--depth', '1', `file://${resolve(repo)}`, base]);
+    git(dirname(base), ['clone', '-q', '--depth', '1', pathToFileURL(resolve(repo)).href, base]);
     git(base, ['remote', 'remove', 'origin']);
   }
   const have = git(base, ['rev-parse', 'HEAD']).trim();
