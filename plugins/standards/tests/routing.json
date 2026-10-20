@@ -25,10 +25,10 @@
       "expect": "write"
     },
     {
-      "id": "write-shape-b",
-      "request": "Generate the standards as one skill per area instead of a single index.",
+      "id": "write-regenerate",
+      "request": "The conventions changed after the last mine. Regenerate our standards from the new clusters.",
       "expect": "write",
-      "why": "Output shape B is a write option."
+      "why": "Turning clusters into standards is write, even when standards already exist."
     },
     {
       "id": "review-branch",

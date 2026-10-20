@@ -45,6 +45,8 @@ node --test 'plugins/standards/tests/*.test.mjs'  # the standards scripts
 
 Errors print as `file:line rule message`, and the lint exits non-zero when it finds any. Every check has a violating fixture in `scripts/lint-fixtures/`, and `scripts/lint.test.mjs` proves each fixture fails its rule and the clean fixture passes. Add a fixture and a test with every check you add.
 
+`plugins/standards/tests/routing.json` is the input for the routing check. After any change to the standards `SKILL.md`, give a fresh agent only that `SKILL.md` and the file's `context`, one request at a time, and score it as `how_to_score` says. It must route every case, because a router that sends a request to the wrong command fails before any rule runs. `routing.test.mjs` checks only that each case names a command `SKILL.md` lists; the agent run is the check itself.
+
 Run `node scripts/test-harnesses.mjs` before each release. It runs the skills in every installed harness, which needs each harness's login, so CI can't run it. Set `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) first, so claude takes its login from the environment and no copy lands on disk. The other harnesses' logins are copied into one owner-only temp folder that the script removes on exit, on an error and on an interrupt.
 
 CI runs the lint and its tests on every push, every pull request and once a month, so rot shows even when nobody pushes. Pin each action by full commit SHA.
