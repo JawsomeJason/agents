@@ -833,8 +833,9 @@ export async function step(ctx) {
         ctx.log(`${rule.section} ${n.harness} ${n.arm}: ${failedHere} failed attempts, not retrying; see failures.jsonl`);
         continue;
       }
-      const have = runs.filter((r) => r.section === rule.section && r.harness === n.harness && r.arm === n.arm).length;
-      for (let i = 1; i <= n.count; i++) jobs.push({ rule, harness: ctx.active.find((h) => h.name === n.harness), arm: n.arm, number: have + i });
+      // Number after the highest run on disk, not the count: a run lost mid-step leaves a gap, and counting would reuse a finished run's number and overwrite it.
+      const last = Math.max(0, ...runs.filter((r) => r.section === rule.section && r.harness === n.harness && r.arm === n.arm).map((r) => r.run));
+      for (let i = 1; i <= n.count; i++) jobs.push({ rule, harness: ctx.active.find((h) => h.name === n.harness), arm: n.arm, number: last + i });
     }
   }
   ctx.log(`${done.length} rules decided, ${jobs.length} runs to do, ${waiting.length} rules waiting on grading`);

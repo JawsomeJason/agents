@@ -310,6 +310,19 @@ test('worktrees hold only the checkout: no remote, one commit, and the standards
   assert.ok(diff.includes(`+pwd=${seen.wt}\n`), 'the agent starts in its worktree, not the directory the runner started in');
 });
 
+test('a run lost mid-step leaves a gap, and the next step numbers after the highest run instead of overwriting one', async () => {
+  const fx = fixture();
+  await step(context(fx));
+  const runs = readRuns(fx.out).filter((r) => r.section === '§1.1');
+  const lost = runs.find((r) => r.run === 2);
+  rmSync(lost.dir, { recursive: true });
+  const kept = readRuns(fx.out).filter((r) => r.section === '§1.1').map((r) => [r.run, r.finished_at]);
+  await step(context(fx));
+  const after = readRuns(fx.out).filter((r) => r.section === '§1.1');
+  assert.deepEqual(after.map((r) => r.run).sort(), [1, 3, 4, 5, 6]);
+  for (const [n, at] of kept) assert.equal(after.find((r) => r.run === n).finished_at, at, `run ${n} was left alone`);
+});
+
 test('a scoped step ignores the runs of rules outside its scope', async () => {
   const fx = fixture();
   await step(context(fx));
