@@ -107,7 +107,7 @@ Done when every check passes.
 
 ## Step 8. Report
 
-List the files written, the § count per area, the homes table from step 2 with each thin home and its pointer offer, the check candidates, any cluster left out for having no why, each cluster split into several rules or pooled into another, and any rule left out for too little evidence. Offer `prune` next, because a rule agents already follow costs tokens on every load and changes nothing.
+List the files written, the § count per area, the homes table from step 2 with each thin home and its pointer offer, each existing rule marked `dead` with the file, API or tool it names that is gone, the check candidates, any cluster left out for having no why, each cluster split into several rules or pooled into another, and any rule left out for too little evidence. Offer `prune` next, because a rule agents already follow costs tokens on every load and changes nothing.
 
 ## Shape experiment
 
