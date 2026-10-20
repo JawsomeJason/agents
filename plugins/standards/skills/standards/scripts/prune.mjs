@@ -418,9 +418,15 @@ export function privateDir(parent, prefix = 'standards-prune-') {
 // ---------------------------------------------------------------------------------------------
 // Harness adapters
 
-function cleanEnv(extra) {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(CLAUDE|ANTHROPIC|OPENAI|CODEX|OPENCODE|XDG_)/.test(k)));
-  return { ...env, ...extra };
+const PASS_ENV = /^(?:PATH|HOME|LANG|LC_\w+|TERM|TMPDIR|USER|SHELL)$/;
+
+/**
+ * An agent's environment: the caller's locale, shell and path basics, plus what the adapter adds for its own
+ * login and what --env names. Everything else stays out, such as a forge token or a cloud key, because the agent
+ * runs the target repo's own scripts with whatever it is handed.
+ */
+export function harnessEnv(extra) {
+  return { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => PASS_ENV.test(k))), ...extra };
 }
 
 // A bare temp home has no keychain, so the OS asks the user to reset one whenever a harness stores its
@@ -656,7 +662,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
     const pinned = ctx.models.get(harness.name) ?? null;
     const { argv, env } = harness.adapter.prepare({ tmp, scratch: ctx.scratch.dir, wt, prompt, writable, model: pinned });
     // Some harnesses take their working directory from $PWD, which a spawn does not update.
-    const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: cleanEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
+    const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: harnessEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
     if (res.code !== 0 && THROTTLED.test(`${res.stdout}\n${res.stderr}`)) return { failed: `throttled${tail(res)}`, throttled: true, log: `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX) };
     const { diff, files } = captureDiff(wt, ctx.head);
     const got = harness.adapter.collect({ tmp, stdout: res.stdout, stderr: res.stderr });

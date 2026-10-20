@@ -12,7 +12,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameS
 import { homedir, tmpdir } from 'node:os';
 import { basename, delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { privateDir } from '../plugins/standards/skills/standards/scripts/prune.mjs';
+import { harnessEnv, privateDir } from '../plugins/standards/skills/standards/scripts/prune.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
 const HOME = homedir();
@@ -47,14 +47,6 @@ const norm = (s) => s.replace(/[`*|]/g, ' ').replace(/\s+/g, ' ').trim().toLower
 
 function onPath(bin) {
   return (process.env.PATH ?? '').split(delimiter).some((d) => existsSync(join(d, bin)));
-}
-
-/** A clean env: the caller's PATH and basics, with every home and key override dropped. */
-function cleanEnv(extra) {
-  const drop = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'OPENAI_API_KEY', 'CLAUDE_CONFIG_DIR', 'CODEX_HOME',
-    'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME'];
-  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !drop.includes(k)));
-  return { ...env, ...extra };
 }
 
 // A bare temp home has no keychain, so the OS asks the user to reset one whenever a harness stores its
@@ -110,7 +102,7 @@ export const HARNESSES = {
         cmd: 'claude',
         argv: ['-p', PROMPT, '--model', CLAUDE_MODEL, '--plugin-dir', join(repo, 'plugins/standards'),
           '--permission-mode', 'bypassPermissions', '--max-turns', '8'],
-        env: cleanEnv({ CLAUDE_CONFIG_DIR: cfg, ...(token ? { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' } : {}) }),
+        env: harnessEnv({ CLAUDE_CONFIG_DIR: cfg, ...(token ? { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' } : {}) }),
       };
     },
   },
@@ -122,7 +114,7 @@ export const HARNESSES = {
       const codexHome = join(tmp, 'codex');
       mkdirSync(codexHome);
       copyFileSync(join(HOME, '.codex/auth.json'), join(codexHome, 'auth.json'));
-      const env = cleanEnv({ HOME: join(tmp, 'home'), CODEX_HOME: codexHome });
+      const env = harnessEnv({ HOME: join(tmp, 'home'), CODEX_HOME: codexHome });
       tempHome(env.HOME);
       install('codex', env);
       // stdin stays closed: codex exec waits on an open stdin.
@@ -138,7 +130,7 @@ export const HARNESSES = {
       return existsSync(join(HOME, '.local/share/opencode/auth.json')) ? null : 'not logged in (no auth.json)';
     },
     setup(tmp) {
-      const env = cleanEnv({
+      const env = harnessEnv({
         HOME: join(tmp, 'home'),
         XDG_CONFIG_HOME: join(tmp, 'config'),
         XDG_DATA_HOME: join(tmp, 'data'),

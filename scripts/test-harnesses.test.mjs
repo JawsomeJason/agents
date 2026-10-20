@@ -81,3 +81,21 @@ test('--keep keeps the temp home without its login copy', async () => {
   assert.equal(existsSync(join(keptAt, 'claude/.credentials.json')), false);
   assert.deepEqual(readdirSync(tmp).filter((n) => !n.startsWith('harness-kept-')), [], 'the private scratch is gone');
 });
+
+test('the claude harness gets only the allowlisted environment and its own token', async () => {
+  const { HARNESSES } = await import(SCRIPT);
+  const planted = { GH_TOKEN: 'ghp_FAKE', AWS_SECRET_ACCESS_KEY: 'aws_FAKE', CLAUDE_CODE_OAUTH_TOKEN: 'tok_FAKE' };
+  const saved = Object.fromEntries(Object.keys(planted).map((k) => [k, process.env[k]]));
+  Object.assign(process.env, planted);
+  try {
+    const tmp = mkdtempSync(join(tmpdir(), 'harness-test-'));
+    const { env } = HARNESSES.claude.setup(tmp);
+    assert.equal(env.GH_TOKEN, undefined);
+    assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
+    assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, 'tok_FAKE');
+    assert.equal(env.PATH, process.env.PATH);
+    assert.equal(existsSync(join(tmp, 'claude/.credentials.json')), false, 'no login file with a token set');
+  } finally {
+    for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+});

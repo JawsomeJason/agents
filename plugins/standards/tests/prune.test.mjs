@@ -585,3 +585,20 @@ test('without a token, the claude adapter writes the login once per process into
     if (saved !== undefined) process.env.CLAUDE_CODE_OAUTH_TOKEN = saved;
   }
 });
+
+test('an agent gets only the allowlisted environment, never the caller\'s tokens and keys', async () => {
+  const fx = fixture();
+  const planted = { GH_TOKEN: 'ghp_FAKE', AWS_SECRET_ACCESS_KEY: 'aws_FAKE', SOME_API_KEY: 'key_FAKE', LC_CTYPE: 'C' };
+  const saved = Object.fromEntries(Object.keys(planted).map((k) => [k, process.env[k]]));
+  Object.assign(process.env, planted);
+  try {
+    const adapter = { ...fakeAdapter(), prepare: ({ wt }) => ({ argv: ['-c', `env | sort > ${wt}/env.txt`], env: { ADAPTER_LOGIN: 'mine' } }) };
+    const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a'], env: ['EXTRA=1'], log: () => {} }, { fake: adapter });
+    const r = await trial(ctx, '§1.1', 'fake');
+    const names = readFileSync(join(r.dest, 'diff.patch'), 'utf8').split('\n').filter((l) => /^\+[A-Z_]+=/.test(l)).map((l) => l.slice(1, l.indexOf('=')));
+    assert.ok(!names.includes('GH_TOKEN') && !names.includes('AWS_SECRET_ACCESS_KEY') && !names.includes('SOME_API_KEY'), names.join(' '));
+    for (const k of ['PATH', 'LC_CTYPE', 'ADAPTER_LOGIN', 'EXTRA', 'PWD']) assert.ok(names.includes(k), `${k} reaches the agent`);
+  } finally {
+    for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+});
