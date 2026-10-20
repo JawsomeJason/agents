@@ -2,7 +2,17 @@
 
 Runs a baseline A/B per rule and deletes the rules agents follow without being told. A rule agents already follow costs context on every load and changes nothing. Each rule that survives keeps the cheapest form that still works.
 
-Run from the target repo's root, on standards that `write` produced. No script covers this command. Write a short script to tally runs, because the decisions below turn on exact counts.
+Run from the target repo's root, on standards that `write` produced. `<skill-dir>/scripts/prune.mjs` carries the mechanics: isolation, the arms, the sampling, the tallies and the decisions, because the decisions turn on exact counts. Its subcommands map to the steps below, and every one resumes from the run folder it was given, so a stopped run loses nothing.
+
+| Subcommand | Does |
+| --- | --- |
+| `plan` | Prints the rule count, the harnesses and the most runs the sampling could take. |
+| `trial` | Runs one probe once in the `none` arm and keeps it apart from the counted runs (step 1). |
+| `step` | Runs every batch the sampling still needs, then writes the grading questions (steps 2 and 3). |
+| `status` | Prints each rule's tallies and what it waits on. |
+| `finish` | Applies the decision rules and writes `prune.json` (steps 4 and 5). |
+
+Run `step`, grade, and run `step` again until `status` shows every rule decided, then `finish`. A rule moves one batch per `step`, because the next batch depends on how the last one graded.
 
 ## Scope
 
@@ -12,14 +22,15 @@ Accepts an area slug or §. See [scope](scope.md) for the forms and how to resol
 
 **Pick the rules.** Probe every § unless the user names some. Show the user the plan first, with the rule count, the harnesses and the most runs it could take, because each run is a full agent session.
 
-**Find the harnesses.** List every agent harness on this machine that can run one prompt non-interactively and exit. Ask the user when you cannot tell which ones they use. For each harness, record its command name, its version and the ID of the default model it runs on. Take the model ID from the harness's own output. When the harness does not report it, ask the user.
+**Find the harnesses.** List every agent harness on this machine that can run one prompt non-interactively and exit. Ask the user when you cannot tell which ones they use. For each harness, record its command name, its version and the ID of the default model it runs on. Take the model ID from the harness's own output. When the harness does not report it, ask the user. The runner has an adapter for each harness it knows, and reads the model ID from the run itself. Add a harness by adding an adapter.
 
 **Isolate every run.**
 
 - Give each run a fresh temporary home directory. Copy in only what the harness needs to authenticate. User-level instruction files and skills would otherwise leak rules into the no-rule arm.
-- Give each run a fresh `git worktree` of the target repo at HEAD, with the standards folder deleted from it. Only the arm's text should carry the rule.
+- Give each run a fresh `git worktree` of the target repo at HEAD, with the standards folder deleted from it. Only the arm's text should carry the rule. The runner takes the worktrees from a one-commit clone with no remote, so an agent cannot read later history to find the change it was asked for.
 - Run each harness on its default model. Users run the default, so that is the model a rule has to work on.
-- Mark a harness that cannot authenticate or cannot run headless as skipped, with the reason. A skipped harness never counts as complying.
+- Mark a harness that cannot authenticate or cannot run headless as skipped, with the reason. A skipped harness never counts as complying. Pass `--skip name:reason` for a harness that is installed but cannot run now. Later, drop the `--skip` and run `step` again: the runs that exist stay, and the harness catches up.
+- A run that ends with no change, a timeout or an error is not a run. The runner retries it up to 3 times, logs each failure in `failures.jsonl`, and counts only runs that left a diff.
 
 **Deliver the arm in the prompt.** Every harness reads its prompt, so the arms differ only in the rule text. Each prompt is the arm's text, a blank line, then the probe.
 
@@ -31,9 +42,9 @@ Accepts an area slug or §. See [scope](scope.md) for the forms and how to resol
 
 ## Step 1. Generate a probe
 
-Write a probe task for the rule: a realistic change in this repo whose easiest solution breaks the rule. The probe never mentions the rule. A probe that names the rule measures reading, not following.
+Write a probe task for the rule: a realistic change in this repo whose easiest solution breaks the rule. The probe never mentions the rule. A probe that names the rule measures reading, not following. Save the probes in `probes.json` per [the probes schema](schemas/prune.probes.schema.json), one per §, each with the whole task text including how to finish.
 
-Run the probe once in the `none` arm and read the output. When the output never makes the kind of change the rule governs, the probe cannot test the rule. Rewrite it and try again. Do not count this trial run.
+Run `trial` for the probe, which runs it once in the `none` arm, and read the output. When the output never makes the kind of change the rule governs, the probe cannot test the rule. Rewrite it and try again. Do not count this trial run.
 
 ## Step 2. Run the arms
 
@@ -45,6 +56,8 @@ Ask one yes/no question per output: "Does this output follow <rule>?", with the 
 
 A judgment model is a fast model that answers typed questions (pick one of a set, a yes/no probability, a score) with calibrated probabilities. If your environment gives you a judgment model, grade with it; otherwise use the fallback grader below.
 
+`step` writes `grading/<grader>.questions.jsonl` for each grader, in the same questions and answers pattern `mine` uses, per [the questions schema](schemas/prune.questions.schema.json). Each is one yes/no question with an opaque id, so a grader cannot tell the arm or the harness. Write the answers to `grading/<grader>.answers.jsonl` per [the answers schema](schemas/prune.answers.schema.json). Rerunning `step` reads them.
+
 Calibrate a judgment model before trusting it:
 
 1. Gather 30 outputs, spread across arms and harnesses.
@@ -53,6 +66,8 @@ Calibrate a judgment model before trusting it:
 4. Record the labeled count, the agreed count and the agreement in `prune.json`.
 
 When agreement falls under 90%, when there is no judgment model, or when the user declines to label, a fresh subagent that did not write the probe grades instead. Give it the rule, the § and the diff, and nothing about which arm produced the output. A grader that wrote the probe knows what it was trying to provoke, and a grader that knows the arm expects the rule to win. Say in the report which grader ran and why.
+
+When no human labels exist, the runner can take a consensus instead: two graders vote on every output and a third breaks each tie, named in order by `--graders`. Record the agreement between the two voters. It tells you how much the graders share a reading, and it is weaker than calibration, because two graders can share a bias. `prune.json` marks such a run `consensus` with `calibration` null, and treats its decisions as provisional.
 
 ## Step 3. Sample sequentially
 
@@ -81,10 +96,12 @@ Show the planned edits as a diff, then apply them.
 
 ## Step 5. Write prune.json
 
-Write `prune.json` into the standards folder, beside its `SKILL.md`, per [the prune schema](schemas/prune.schema.json). Record every harness with its model ID and status, every rule with its probe, tallies and decision, and every graded run with its harness, model ID and date.
+Write `prune.json` into the standards folder, beside its `SKILL.md`, per [the prune schema](schemas/prune.schema.json). `finish` writes it. Record every harness with its model ID and status, every rule with its probe, tallies, lift and decision, and every graded run with its harness, model ID and date. Lift is compliance with the rule minus compliance without it, per harness and pooled, for each rule arm that ran. It is the writing-side value of the rule. A deleted rule has no lift, because its rule arms never ran. `finish` recounts every tally from the graded runs and refuses to write when they differ.
+
+Mark a decision provisional when it rests on fewer harnesses than are installed or on a grader that did not pass calibration. A rerun with the missing harness replaces it.
 
 A rule pruned on one model may be needed on the next one. `doctor` compares these model IDs with each harness's default and flags the record as stale when they differ. `write` reads the `delete` decisions so it does not write a deleted rule back.
 
 Done when `prune.json` validates against the schema and its tallies match its runs.
 
-Report a table of rule, decision and tallies per harness. Name the grader, its calibration result, and every skipped harness with its reason.
+Report a table of rule, tallies per arm and harness, lift and decision. Name the grader, its calibration result or consensus agreement, every skipped harness with its reason, and the runs used per harness.
