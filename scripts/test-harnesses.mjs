@@ -7,12 +7,12 @@
 //   node scripts/test-harnesses.mjs [--harness claude,codex,opencode] [--keep]
 //
 // Needs real auth and spends real quota, so it stays out of CI. Run it before each release.
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, delimiter, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { harnessEnv, privateDir } from '../plugins/standards/skills/standards/scripts/prune.mjs';
+import { harnessEnv, privateDir, spawnGuarded } from '../plugins/standards/skills/standards/scripts/prune.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
 const HOME = homedir();
@@ -63,20 +63,9 @@ function install(harness, env) {
   if (r.status !== 0 || !/applied: [1-9]/.test(r.stdout)) throw new Error(`install.sh failed: ${r.stdout}${r.stderr}`);
 }
 
-function run(cmd, argv, cwd, env, scratch) {
-  return new Promise((done) => {
-    const child = spawn(cmd, argv, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
-    scratch.track(child);
-    let out = '';
-    let err = '';
-    child.stdout.on('data', (d) => (out += d));
-    child.stderr.on('data', (d) => (err += d));
-    const timer = setTimeout(() => process.kill(-child.pid, 'SIGKILL'), TIMEOUT_MS);
-    child.on('close', (code, signal) => {
-      clearTimeout(timer);
-      done({ out, err, code: signal ? `killed (${signal}, timeout ${TIMEOUT_MS / 1000}s)` : code });
-    });
-  });
+async function run(cmd, argv, cwd, env, scratch) {
+  const r = await spawnGuarded(cmd, argv, { cwd, env, timeoutMs: TIMEOUT_MS, track: scratch.track });
+  return { out: r.stdout, err: r.stderr, code: r.timedOut ? `killed (timeout ${TIMEOUT_MS / 1000}s)` : r.signal ? `killed (${r.signal})` : r.code };
 }
 
 // Each harness: auth() returns a skip reason or null; setup() builds the temp home and
@@ -194,7 +183,7 @@ export async function main(args, harnesses = HARNESSES) {
     return 2;
   }
   const menu = menuLines();
-  // Every temp home and login copy lives in one owner-only folder, removed on exit, on an uncaught error, SIGINT and SIGTERM.
+  // Every temp home and login copy lives in one owner-only folder, removed on exit, on an uncaught error, SIGINT, SIGTERM and SIGHUP.
   const scratch = privateDir(tmpdir(), 'harness-');
   const kept = keep ? mkdtempSync(join(tmpdir(), 'harness-kept-')) : null;
   try {

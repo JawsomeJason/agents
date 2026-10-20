@@ -562,7 +562,7 @@ const alive = (pid) => {
   }
 };
 
-for (const signal of ['SIGINT', 'SIGTERM']) {
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   test(`${signal} removes the private scratch with its login copy and kills the agent`, async () => {
     const fx = fixture();
     const { child, exited, started, tmpRoot } = childTrial(fx, 'wait');
@@ -577,6 +577,41 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     assert.equal(alive(agentPid), false, 'the agent died with the runner');
   });
 }
+
+test('an agent dies when its runner is killed with no chance to clean up', async () => {
+  const fx = fixture();
+  const { child, exited, started } = childTrial(fx, 'wait');
+  const agentPid = await started;
+  child.kill('SIGKILL');
+  await exited;
+  const deadline = Date.now() + 3000;
+  while (alive(agentPid) && Date.now() < deadline) await new Promise((done) => setTimeout(done, 50));
+  assert.equal(alive(agentPid), false, 'the watchdog killed the orphaned agent');
+});
+
+test('an agent dies at its timeout even when the runner timer never fires', async () => {
+  const dir = tempDir();
+  const pidFile = join(dir, 'pid');
+  const script = join(dir, 'blocked.mjs');
+  // The runner starts the agent, then blocks its own event loop, so its timer cannot fire.
+  writeFileSync(script, `
+    import { existsSync } from 'node:fs';
+    const { spawnGuarded } = await import(${JSON.stringify(PRUNE)});
+    spawnGuarded('sh', ['-c', 'echo $$ > ${pidFile}; exec sleep 30'], { cwd: ${JSON.stringify(dir)}, env: process.env, timeoutMs: 100 });
+    while (!existsSync(${JSON.stringify(pidFile)})) await new Promise((done) => setTimeout(done, 10));
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 6000);
+  `);
+  const runner = spawn(process.execPath, [script], { stdio: 'ignore' });
+  while (!existsSync(pidFile) || !readFileSync(pidFile, 'utf8').trim()) await new Promise((done) => setTimeout(done, 20));
+  const agentPid = Number(readFileSync(pidFile, 'utf8'));
+  const deadline = Date.now() + 4500;
+  while (alive(agentPid) && Date.now() < deadline) await new Promise((done) => setTimeout(done, 50));
+  const agentAlive = alive(agentPid);
+  const runnerAlive = alive(runner.pid);
+  runner.kill('SIGKILL');
+  assert.equal(runnerAlive, true, 'the runner was still blocked');
+  assert.equal(agentAlive, false, 'the watchdog killed the agent at its own timeout');
+});
 
 test('an uncaught error removes the private scratch with its login copy', async () => {
   const fx = fixture();

@@ -65,7 +65,7 @@ const alive = (pid) => {
   }
 };
 
-for (const signal of ['SIGINT', 'SIGTERM']) {
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   test(`${signal} removes every temp home and login copy and kills the harness`, async () => {
     const { child, exited, started, tmp } = childRun('echo $$ > PIDFILE; exec sleep 30');
     const pid = await started;

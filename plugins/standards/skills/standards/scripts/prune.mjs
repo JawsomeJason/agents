@@ -395,10 +395,54 @@ function killGroup(pid) {
   }
 }
 
+const EXIT_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+
+// Runs the agent in its own process group and kills that whole group when the time runs out or when the
+// parent is gone, so an agent outlives neither a parent killed with no chance to clean up nor its timeout.
+const WATCHDOG = `
+const { spawn } = require('node:child_process');
+const [ms, parent, cmd, ...argv] = process.argv.slice(1);
+const killGroup = () => { try { process.kill(-process.pid, 'SIGKILL'); } finally { process.exit(137); } };
+const child = spawn(cmd, argv, { stdio: 'inherit' });
+child.on('error', (e) => { process.stderr.write(e.message + '\\n'); process.exit(127); });
+child.on('exit', (code, signal) => process.exit(code ?? 128));
+setTimeout(killGroup, Number(ms));
+setInterval(() => { if (process.ppid !== Number(parent)) killGroup(); }, 250);
+`;
+
+// The parent's own timer fires first while the parent lives; the watchdog's is the backstop.
+const WATCHDOG_GRACE_MS = 2000;
+
+/**
+ * Spawns cmd under the watchdog, detached into its own process group. Resolves with its output, exit code
+ * and whether the timeout killed it. track(child) lets privateDir kill the group on a signal.
+ */
+export function spawnGuarded(cmd, argv, { cwd, env, timeoutMs, track }) {
+  return new Promise((done) => {
+    const child = spawn(process.execPath, ['-e', WATCHDOG, String(timeoutMs + WATCHDOG_GRACE_MS), String(process.pid), cmd, ...argv], { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    track?.(child);
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('error', (e) => done({ stdout, stderr: `${stderr}${e.message}`, code: null, signal: null, timedOut }));
+    const timer = setTimeout(() => {
+      timedOut = true;
+      killGroup(child.pid);
+    }, timeoutMs);
+    child.on('close', (code, signal) => {
+      clearTimeout(timer);
+      done({ stdout, stderr, code, signal, timedOut });
+    });
+  });
+}
+
 /**
  * One folder per process, readable only by its owner, for every run's temp home and login copy.
- * It is removed on a normal exit, an uncaught error, SIGINT and SIGTERM, and by dispose(). A signal
- * also kills the agents first: each runs in its own process group, so a terminal's Ctrl-C never reaches it.
+ * It is removed on a normal exit, an uncaught error, SIGINT, SIGTERM and SIGHUP, and by dispose(). A signal
+ * also kills the agents first: each runs in its own process group, so neither a terminal's Ctrl-C nor the
+ * hangup from closing the terminal reaches it.
  */
 export function privateDir(parent, prefix = 'standards-prune-') {
   const dir = mkdtempSync(join(parent, prefix));
@@ -411,8 +455,7 @@ export function privateDir(parent, prefix = 'standards-prune-') {
     remove();
     process.kill(process.pid, signal);
   };
-  process.once('SIGINT', onSignal);
-  process.once('SIGTERM', onSignal);
+  for (const signal of EXIT_SIGNALS) process.once(signal, onSignal);
   process.once('exit', remove);
   return {
     dir,
@@ -421,8 +464,7 @@ export function privateDir(parent, prefix = 'standards-prune-') {
       child.once('close', () => children.delete(child.pid));
     },
     dispose() {
-      process.off('SIGINT', onSignal);
-      process.off('SIGTERM', onSignal);
+      for (const signal of EXIT_SIGNALS) process.off(signal, onSignal);
       process.off('exit', remove);
       remove();
     },
@@ -630,31 +672,6 @@ const locked = (fn) => {
   return next;
 };
 
-function runProcess(cmd, argv, { cwd, env, timeoutMs, track }) {
-  return new Promise((done) => {
-    const child = spawn(cmd, argv, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
-    track?.(child);
-    let stdout = '';
-    let stderr = '';
-    let timedOut = false;
-    child.stdout.on('data', (d) => (stdout += d));
-    child.stderr.on('data', (d) => (stderr += d));
-    child.on('error', (e) => done({ stdout, stderr: `${stderr}${e.message}`, code: null, timedOut }));
-    const timer = setTimeout(() => {
-      timedOut = true;
-      try {
-        process.kill(-child.pid, 'SIGKILL');
-      } catch {
-        // the process group already exited
-      }
-    }, timeoutMs);
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      done({ stdout, stderr, code, timedOut });
-    });
-  });
-}
-
 const tail = (res) => {
   const t = (res.stderr.trim() || res.stdout.trim()).split('\n').slice(-3).join(' ').slice(-240);
   return t ? `: ${t}` : '';
@@ -697,7 +714,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
     const pinned = pin?.model ?? null;
     const { argv, env } = harness.adapter.prepare({ tmp, scratch: ctx.scratch.dir, wt, prompt, writable, model: pinned });
     // Some harnesses take their working directory from $PWD, which a spawn does not update.
-    const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: harnessEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
+    const res = await spawnGuarded(harness.adapter.command, argv, { cwd: wt, env: harnessEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
     if (res.code !== 0 && THROTTLED.test(`${res.stdout}\n${res.stderr}`)) return { failed: `throttled${tail(res)}`, throttled: true, log: `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX) };
     const { diff, files } = captureDiff(wt, ctx.head, ctx.standardsRel);
     const got = harness.adapter.collect({ tmp, stdout: res.stdout, stderr: res.stderr, model: pinned });
