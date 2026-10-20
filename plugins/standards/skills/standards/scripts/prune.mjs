@@ -38,6 +38,7 @@ const USAGE = [
   '  --writable <dir>    extra directory an agent may write to (repeatable)',
   '  --prune-json <file> where finish writes prune.json (default: beside the standards SKILL.md)',
   '  --summary <file>    where finish writes the per-rule markdown table',
+  '  --calibration <file> human labels, one {question_id, complies} per line, that finish scores the first grader against',
   '  --dry-run           print what step would run, and run nothing',
   '',
   'The harnesses found on this machine: codex, opencode, claude. Run with --help for this text.',
@@ -48,6 +49,8 @@ export const ARMS = ['none', 'one-liner', 'full'];
 export const BATCH = 5;
 export const DELETE_THRESHOLD = 0.9;
 export const KEEP_MARGIN = 1;
+export const CALIBRATION_MIN = 30;
+export const CALIBRATION_PASS = 0.9;
 const RULE_ARMS = ['one-liner', 'full'];
 const MAX_FAILURES_PER_CELL = 8;
 const MAX_THROTTLES_PER_RUN = 3;
@@ -872,6 +875,7 @@ export function createContext(opts, adapters = ADAPTERS) {
     writable: (opts.writable ?? []).map((d) => resolve(d)),
     pruneJson: opts['prune-json'] ? resolve(opts['prune-json']) : join(standardsDir, 'prune.json'),
     summary: opts.summary ? resolve(opts.summary) : null,
+    calibrationFile: opts.calibration ? resolve(opts.calibration) : null,
     dryRun: Boolean(opts['dry-run']),
     log: opts.log ?? ((s) => console.log(s)),
   };
@@ -1097,6 +1101,8 @@ export function finish(ctx) {
   const runs = scopedRuns(ctx);
   const vmap = verdicts(ctx, runs);
   if (vmap.problems.length) throw new UsageError(`answers files have ${vmap.problems.length} problems; run status to see them`);
+  const calibration = ctx.calibrationFile ? calibrate(ctx, vmap) : null;
+  const provisional = provisionalReason(ctx, calibration);
   const undecided = [];
   const rules = [];
   for (const rule of ctx.rules) {
@@ -1117,7 +1123,7 @@ export function finish(ctx) {
       rule: rule.rule,
       probe: ctx.probes.get(rule.section),
       decision: st.decision,
-      provisional: isProvisional(ctx),
+      provisional: provisional !== null,
       tallies,
       lift: liftOf(st.cells, ctx.activeNames),
       reason: st.reason,
@@ -1142,8 +1148,8 @@ export function finish(ctx) {
     standards_path: ctx.standardsPath,
     commit: commits[0],
     sampling: { batch: BATCH, delete_threshold: DELETE_THRESHOLD, keep_margin: KEEP_MARGIN },
-    grader: graderRecord(ctx, vmap, runs),
-    provisional: isProvisional(ctx) ? provisionalReason(ctx) : null,
+    grader: graderRecord(ctx, vmap, runs, calibration),
+    provisional,
     harnesses: harnessRecords(ctx, runs),
     rules,
     runs: graded,
@@ -1175,22 +1181,48 @@ export function reconcile(record) {
   return out;
 }
 
-const missingRequested = (ctx) => ctx.harnesses.filter((h) => ctx.requested.includes(h.name) && h.status !== 'ran');
-const isProvisional = (ctx) => missingRequested(ctx).length > 0;
-const provisionalReason = (ctx) => {
-  const missing = missingRequested(ctx).map((h) => `${h.name} (${h.reason})`);
-  return `Decided on ${ctx.active.length} of ${ctx.requested.length} requested harnesses; did not run: ${missing.join(', ')}. Rerun step and finish with them to confirm.`;
-};
+/** Why the decisions may change, or null: a requested harness that did not run, or a grader that did not pass calibration. */
+function provisionalReason(ctx, calibration) {
+  const reasons = [];
+  const missing = ctx.harnesses.filter((h) => ctx.requested.includes(h.name) && h.status !== 'ran').map((h) => `${h.name} (${h.reason})`);
+  if (missing.length) reasons.push(`Decided on ${ctx.active.length} of ${ctx.requested.length} requested harnesses; did not run: ${missing.join(', ')}. Rerun step and finish with them to confirm.`);
+  if (!calibration) reasons.push(`The grader was not calibrated against human labels; pass --calibration with at least ${CALIBRATION_MIN}.`);
+  else if (!calibration.passed) reasons.push(`The grader agreed with ${calibration.agreed} of ${calibration.labeled} human labels, under ${CALIBRATION_PASS * 100}%.`);
+  return reasons.length ? reasons.join(' ') : null;
+}
 
-function graderRecord(ctx, vmap, runs) {
+/** Scores the first grader's answers against the human labels in --calibration. */
+export function calibrate(ctx, vmap) {
+  const labels = readJsonl(ctx.calibrationFile);
+  const first = ctx.graders[0];
+  const byId = new Map([...vmap.byRun.values()].map((v) => [v.id, v.answers[first]]));
+  const seen = new Set();
+  let agreed = 0;
+  for (const [i, l] of labels.entries()) {
+    const where = `${ctx.calibrationFile}:${i + 1}`;
+    if (typeof l?.question_id !== 'string' || typeof l.complies !== 'boolean') throw new UsageError(`${where}: each label needs question_id and a boolean complies`);
+    if (seen.has(l.question_id)) throw new UsageError(`${where}: ${l.question_id} is labeled twice`);
+    seen.add(l.question_id);
+    const answer = byId.get(l.question_id);
+    if (!answer) throw new UsageError(`${where}: ${l.question_id} has no answer from ${first}, the grader being calibrated`);
+    if (answer.answer === l.complies) agreed++;
+  }
+  if (labels.length < CALIBRATION_MIN) throw new UsageError(`${ctx.calibrationFile} holds ${labels.length} labels; calibration needs at least ${CALIBRATION_MIN}`);
+  const agreement = round(agreed / labels.length);
+  return { labeled: labels.length, agreed, agreement, passed: agreed / labels.length >= CALIBRATION_PASS };
+}
+
+function graderRecord(ctx, vmap, runs, calibration) {
   const rows = runs.map((r) => vmap.byRun.get(runKey(r)));
   const models = new Set(rows.flatMap((v) => Object.values(v.answers).filter((a) => a?.answered_by === 'judgment-model').map((a) => a.model)));
   const bothAnswered = rows.filter((v) => ctx.graders.length > 1 && v.votes[ctx.graders[0]] !== undefined && v.votes[ctx.graders[1]] !== undefined);
   const agreed = bothAnswered.filter((v) => v.agreed).length;
+  const firstAnswers = rows.map((v) => v.answers[ctx.graders[0]]).filter(Boolean);
+  const firstByModel = firstAnswers.length > 0 && firstAnswers.every((a) => a.answered_by === 'judgment-model');
   return {
-    kind: ctx.graders.length > 1 ? 'consensus' : [...models].length ? 'judgment-model' : 'subagent',
+    kind: ctx.graders.length > 1 ? 'consensus' : firstByModel ? 'judgment-model' : 'subagent',
     model: models.size === 1 ? [...models][0] : null,
-    calibration: null,
+    calibration,
     ...(ctx.graders.length > 1
       ? {
           consensus: {
@@ -1236,7 +1268,7 @@ function parse(argv) {
       harnesses: { type: 'string' }, skip: { type: 'string', multiple: true }, sections: { type: 'string' },
       graders: { type: 'string' }, concurrency: { type: 'string' }, 'timeout-min': { type: 'string' }, 'backoff-sec': { type: 'string' },
       env: { type: 'string', multiple: true }, model: { type: 'string', multiple: true }, writable: { type: 'string', multiple: true },
-      'prune-json': { type: 'string' }, summary: { type: 'string' }, 'dry-run': { type: 'boolean' },
+      'prune-json': { type: 'string' }, summary: { type: 'string' }, calibration: { type: 'string' }, 'dry-run': { type: 'boolean' },
       section: { type: 'string' }, harness: { type: 'string' }, 'tmp-root': { type: 'string' },
     },
   });

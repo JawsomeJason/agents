@@ -65,11 +65,11 @@ Calibrate a judgment model before trusting it:
 1. Gather 30 outputs, spread across arms and harnesses.
 2. Ask the user to label each one yes or no against the rule. Show the rule, the § and the diff for each.
 3. Grade the same 30 with the judgment model. When it agrees with at least 27 of the 30 labels, 90%, it grades every run.
-4. Record the labeled count, the agreed count and the agreement in `prune.json`.
+4. Save the labels one per line, `{question_id, complies}`, per [the labels schema](schemas/prune.labels.schema.json), and pass the file to `finish --calibration`. `finish` scores the first grader in `--graders` against them and records the labeled count, the agreed count, the agreement and whether it passed in `prune.json`.
 
 When agreement falls under 90%, when there is no judgment model, or when the user declines to label, a fresh subagent that did not write the probe grades instead. Give it the rule, the § and the diff, and nothing about which arm produced the output. A grader that wrote the probe knows what it was trying to provoke, and a grader that knows the arm expects the rule to win. Say in the report which grader ran and why.
 
-When no human labels exist, the runner can take a consensus instead: two graders vote on every output and a third breaks each tie, named in order by `--graders`. Record the agreement between the two voters. It tells you how much the graders share a reading, and it is weaker than calibration, because two graders can share a bias. `prune.json` marks such a run `consensus` with `calibration` null, and treats its decisions as provisional.
+When no human labels exist, the runner can take a consensus instead: two graders vote on every output and a third breaks each tie, named in order by `--graders`. Record the agreement between the two voters. It tells you how much the graders share a reading, and it is weaker than calibration, because two graders can share a bias. `prune.json` marks such a run `consensus`. Without `--calibration`, `calibration` is null and every decision is provisional.
 
 ## Step 3. Sample sequentially
 
@@ -102,7 +102,7 @@ Write `prune.json` into the standards folder, beside its `SKILL.md`, per [the pr
 
 Grade with the context a reviewer would have. `step` adds to each question the files the rule points at and the changed files' sibling files from the checkout the runs branched from, because a rule such as "match the sibling" cannot be judged from the diff alone.
 
-Mark a decision provisional when it rests on fewer harnesses than were requested: the ones `--harnesses` names, or every harness the runner knows when it names none. A requested harness that was skipped, not on PATH or not logged in did not run. A rerun with the missing harness replaces the decision. No rule is decided without counted runs: with no harness able to run, `status` shows every rule undecided and `finish` refuses to write `prune.json`.
+Mark a decision provisional when its grader has not passed calibration, because no labels were given or agreement fell under 90%, or when it rests on fewer harnesses than were requested: the ones `--harnesses` names, or every harness the runner knows when it names none. A requested harness that was skipped, not on PATH or not logged in did not run. A rerun with the missing harness replaces the decision. No rule is decided without counted runs: with no harness able to run, `status` shows every rule undecided and `finish` refuses to write `prune.json`.
 
 A rule pruned on one model may be needed on the next one. `doctor` compares these model IDs with each harness's default and flags the record as stale when they differ. `write` reads the `delete` decisions so it does not write a deleted rule back.
 

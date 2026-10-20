@@ -227,8 +227,8 @@ test('step, grading and finish converge on a decision, and a rerun changes nothi
 
   const { record } = finish(ctx);
   assert.deepEqual(validate(loadSchema('prune'), record), []);
-  assert.deepEqual(record.rules.map((r) => [r.section, r.decision, r.provisional]), [['§1.1', 'one-liner', false], ['§1.2', 'one-liner', false]]);
-  assert.equal(record.provisional, null, 'the one requested harness ran');
+  assert.deepEqual(record.rules.map((r) => [r.section, r.decision, r.provisional]), [['§1.1', 'one-liner', true], ['§1.2', 'one-liner', true]]);
+  assert.equal(record.provisional, 'The grader was not calibrated against human labels; pass --calibration with at least 30.', 'the one requested harness ran, but a consensus is not a calibration');
   assert.deepEqual(record.rules[0].tallies, [
     { harness: 'fake', arm: 'none', runs: 5, complied: 0 },
     { harness: 'fake', arm: 'one-liner', runs: 5, complied: 5 },
@@ -701,4 +701,34 @@ test('grading context and prune.json come from the commit the runs branched from
   writeFileSync(join(dir, 'run.json'), JSON.stringify({ ...rec, base_commit: 'abcdef1234567' }));
   assert.throws(() => finish(ctx()), /branched from 2 commits/);
   writeFileSync(join(dir, 'run.json'), JSON.stringify(rec));
+});
+
+test('finish --calibration scores the first grader against human labels, and only a pass clears provisional', async () => {
+  const fx = fixture();
+  const adapters = { fake: fakeAdapter(), other: fakeAdapter() };
+  const labels = join(fx.dir, 'labels.jsonl');
+  const makeCtx = (extra = {}) => createContext({
+    standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake', 'other'], graders: ['a', 'b'],
+    'prune-json': join(fx.out, 'prune.json'), log: () => {}, ...extra,
+  }, adapters);
+  await runToDecision(fx, makeCtx);
+  const answers = readJsonl(join(fx.out, 'grading', 'a.answers.jsonl'));
+  assert.equal(answers.length, 40);
+  const label = (wrong) => writeJsonl(labels, answers.slice(0, 30).map((a, i) => ({ question_id: a.question_id, complies: i < wrong ? !a.answer : a.answer })));
+
+  label(3);
+  let { record } = finish(makeCtx({ calibration: labels }));
+  assert.deepEqual(record.grader.calibration, { labeled: 30, agreed: 27, agreement: 0.9, passed: true });
+  assert.equal(record.provisional, null);
+  assert.ok(record.rules.every((r) => r.provisional === false));
+  assert.deepEqual(validate(loadSchema('prune'), record), []);
+
+  label(4);
+  ({ record } = finish(makeCtx({ calibration: labels })));
+  assert.equal(record.grader.calibration.passed, false);
+  assert.equal(record.provisional, 'The grader agreed with 26 of 30 human labels, under 90%.');
+  assert.ok(record.rules.every((r) => r.provisional === true));
+
+  writeJsonl(labels, answers.slice(0, 29).map((a) => ({ question_id: a.question_id, complies: a.answer })));
+  assert.throws(() => finish(makeCtx({ calibration: labels })), /holds 29 labels; calibration needs at least 30/);
 });

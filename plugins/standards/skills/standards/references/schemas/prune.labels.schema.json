@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "prune calibration label line",
+  "description": "One human label per line of the file passed to `scripts/prune.mjs finish --calibration`. finish scores the first grader in --graders against these labels and needs at least 30.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["question_id", "complies"],
+  "properties": {
+    "question_id": { "type": "string", "minLength": 1, "description": "The id of a grading question the first grader answered." },
+    "complies": { "type": "boolean", "description": "The person's verdict: true when the output follows the rule." }
+  }
+}
