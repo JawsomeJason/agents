@@ -37,7 +37,7 @@ const expected = {
   'vendor-name': 'vendor-name',
 };
 
-const passing = ['clean', 'doc-allow', 'extension-key-allowed'];
+const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-vendor-allowed'];
 
 test('every fixture directory has an expectation', () => {
   const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => !passing.includes(d));
@@ -46,6 +46,10 @@ test('every fixture directory has an expectation', () => {
 
 test('clean fixture passes', () => {
   assert.deepEqual(lint(fixture('clean')), []);
+});
+
+test('generated standards may name the services their repo runs on', () => {
+  assert.deepEqual(lint(fixture('generated-vendor-allowed')), []);
 });
 
 test('an allowlisted extension key passes', () => {

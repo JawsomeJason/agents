@@ -9,6 +9,7 @@
     "fenceMaxLines": 10
   },
   "extensionKeys": ["argument-hint"],
+  "generatedStandardsExempt": ["vendor-name"],
   "urlAllowlist": ["agentskills.io"],
   "docAllow": ["JawsomeJason/jawsome-agents"],
   "denylists": [

@@ -70,9 +70,9 @@ function maskCode(text, maskInline) {
   });
 }
 
-function scanDenylists(file, text, scope, report) {
+function scanDenylists(file, text, scope, report, skip = []) {
   for (const list of denylists) {
-    if (!list.scopes.includes(scope)) continue;
+    if (!list.scopes.includes(scope) || skip.includes(list.rule)) continue;
     maskCode(text, list.skipInlineCode).forEach((line, i) => {
       for (const re of list.regexes) {
         re.lastIndex = 0;
@@ -168,9 +168,12 @@ function lintSkill(skillDir, report) {
     fenceStart = -1;
   });
 
+  // Standards generated for one repo describe that repo, so they may name the services it runs on.
+  const generated = /^\s+generator:\s*standards\s*$/m.test(text.slice(0, text.indexOf('\n---', 3)));
+  const skip = generated ? RULES.generatedStandardsExempt : [];
   for (const file of listFiles(skillDir, (f) => f.endsWith('.md'))) {
     const body = readFileSync(file, 'utf8');
-    scanDenylists(file, body, 'skill', report);
+    scanDenylists(file, body, 'skill', report, skip);
     scanUrls(file, body, report);
     scanLinks(file, body, skillDir, report);
   }
