@@ -45,6 +45,16 @@ test('gh: pages through merged pull requests and maps every comment kind', () =>
   assert.equal(records[0].path, 'CONTRIBUTING.md');
 });
 
+test('gh: records the commit and line the reviewer saw, not where a later push moved them', () => {
+  const responses = structuredClone(GH);
+  const page = responses['repos/tj/commander.js/pulls/2646/comments?per_page=2&page=1'];
+  Object.assign(page[0], { line: null, original_line: 15, commit_id: 'bbbbbbb', original_commit_id: 'aaaaaaa' });
+  const out = join(tempDir(), 'reviews.jsonl');
+  fetchReviews({ cwd: repo(), out, limit: 3, perPage: 2, run: fakeRunner({ responses, cli: { gh: 'ok' } }) });
+  const first = readJsonl(out).find((x) => x.id === `forge:${page[0].id}`);
+  assert.deepEqual([first.commit, first.line], ['aaaaaaa', 15]);
+});
+
 test('gh: --limit stops at that many merged changes', () => {
   const out = join(tempDir(), 'reviews.jsonl');
   const r = fetchGh(repo(), out, { limit: 1 });

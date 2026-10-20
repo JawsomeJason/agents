@@ -117,9 +117,11 @@ function githubRecords(run, forge, change, perPage) {
       created_at: c.created_at,
       body: c.body,
       path: c.path ?? null,
-      line: c.line ?? null,
+      // The original fields name the commit the reviewer saw. commit_id and line move with
+      // later pushes, and line goes null once the comment is outdated.
+      line: c.original_line ?? c.line ?? null,
       diff_hunk: c.diff_hunk ?? null,
-      commit: c.commit_id ?? null,
+      commit: c.original_commit_id ?? c.commit_id ?? null,
       in_reply_to: c.in_reply_to_id ? `forge:${c.in_reply_to_id}` : null,
       url: c.html_url ?? null,
     });

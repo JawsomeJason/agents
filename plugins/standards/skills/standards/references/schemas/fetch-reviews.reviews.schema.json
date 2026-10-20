@@ -49,7 +49,7 @@
     "line": {
       "type": ["integer", "null"],
       "minimum": 1,
-      "description": "Line number in the new version of the file, when the forge gives one."
+      "description": "Line number in the version of the file at commit, when the forge gives one."
     },
     "diff_hunk": {
       "type": ["string", "null"],
