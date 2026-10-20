@@ -21,15 +21,15 @@ Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file is the l
 - {{ change id }} `{{ path }}`:
   > {{ excerpt, under 200 characters }}
 
-  fires: {{ heuristic }}
+  fires: {{ heuristic's short name }}
 - {{ change id }} `{{ path }}`:
   > {{ excerpt }}
 
-  fires: {{ heuristic }}
+  fires: {{ heuristic's short name }}
 - {{ change id }} review body:
   > {{ excerpt from a review's summary text, which has no path }}
 
-  fires: {{ heuristic }}
+  fires: {{ heuristic's short name }}
 
 ## Failure model
 
@@ -49,9 +49,9 @@ Follows the rule:
 
 ## Heuristics
 
-{{ At least one per noun or construct the Rule sentence names. Every Evidence item's `fires:` line names one of these. }}
+{{ At least one per noun or construct the Rule sentence names, each opening with a bold short name. Every Evidence item's `fires:` line gives one of these names. }}
 
-- {{ a pattern a reviewer can match against the added lines of a diff, such as a call, an import or a missing step }}
+- **{{ short name }}.** {{ a pattern a reviewer can match against the added lines of a diff, such as a call, an import or a missing step }}
 
 ## Confirmed when
 
