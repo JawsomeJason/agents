@@ -42,6 +42,7 @@ const expected = {
   'skill-code-url': 'url-allowlist',
   'tracked-identity': 'org-term',
   'doc-history': 'history-word',
+  'workflow-pin': 'workflow-pin',
 };
 
 const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term', 'fence-nested'];
@@ -123,4 +124,8 @@ test('every shipped file is scanned for identity, except LICENSE and the manifes
   const target = fixture('tracked-identity');
   const run = spawnSync(process.execPath, [cli, target], { encoding: 'utf8', env: { ...process.env, STANDARDS_LINT_PRIVATE_DENYLIST: fixture('private-term/denylist.json') } });
   assert.deepEqual(run.stdout.trim().split('\n').map((l) => l.split(' ').slice(0, 2).join(' ').replace(/^.*tracked-identity\//, '')), ['plan.txt:1 org-term', 'plan.txt:2 org-term']);
+});
+
+test('workflows pin every action by SHA and the runner image', () => {
+  assert.deepEqual(lint(fixture('workflow-pin')).map((e) => e.line), [4, 6]);
 });

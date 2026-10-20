@@ -281,6 +281,21 @@ function repoFiles(root) {
   return listFiles(root, () => true).map((f) => relative(root, f).split(sep).join('/'));
 }
 
+/** Actions pinned by full commit SHA and a pinned runner image, so a scheduled red run means the repo rotted. */
+function lintWorkflows(root, report) {
+  const dir = join(root, '.github', 'workflows');
+  if (!existsSync(dir)) return;
+  for (const name of readdirSync(dir).filter((n) => /\.ya?ml$/.test(n))) {
+    const file = join(dir, name);
+    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      const uses = /^\s*-?\s*uses:\s*(\S+)/.exec(line);
+      if (uses && !uses[1].startsWith('./') && !/@[0-9a-f]{40}$/.test(uses[1])) report(file, i + 1, 'workflow-pin', `"${uses[1]}" is not pinned by full commit SHA`);
+      const runsOn = /^\s*runs-on:\s*(.+)$/.exec(line);
+      if (runsOn && /-latest\b/.test(runsOn[1])) report(file, i + 1, 'workflow-pin', `runs-on "${runsOn[1].trim()}" floats; pin an image version`);
+    });
+  }
+}
+
 function findSkillDirs(dir) {
   return listFiles(dir, (f) => basename(f) === 'SKILL.md').map(dirname).sort();
 }
@@ -297,6 +312,7 @@ export function lint(target) {
     const pluginsDir = join(root, 'plugins');
     const skillDirs = existsSync(pluginsDir) ? findSkillDirs(pluginsDir) : [];
     skillDirs.forEach((d) => lintSkill(d, report));
+    lintWorkflows(root, report);
     // Every other file the repo ships: Markdown docs get the doc rules, and everything else the identity rule.
     const inSkill = (rel) => /^plugins\/[^/]+\/skills\//.test(rel);
     for (const rel of repoFiles(root)) {
