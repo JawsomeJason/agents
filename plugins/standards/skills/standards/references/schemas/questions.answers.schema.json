@@ -12,19 +12,19 @@
       "description": "The id of the questions.jsonl line this answers. Each question has exactly one answer."
     },
     "answer": {
-      "type": ["string", "boolean"],
-      "description": "yesno: true or false. choice: one of the question's options. score: one of the question's levels."
+      "type": "string",
+      "description": "choice: one of the question's options. score: one of the question's levels."
     },
     "confidence": {
       "type": "number",
       "minimum": 0,
       "maximum": 1,
-      "description": "The probability that answer is right. For yesno, a true answer with confidence 0.8 means an 0.8 probability the condition holds."
+      "description": "The probability that answer is right: the chosen option's or level's probability."
     },
     "distribution": {
       "type": "object",
       "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 },
-      "description": "Optional probability per option or level, when the answerer gives one. Keys are options, levels, or true and false. Values sum to 1."
+      "description": "Optional probability per option or level, when the answerer gives one. Keys are options or levels. Values sum to 1."
     },
     "answered_by": {
       "enum": ["judgment-model", "agent", "human"],

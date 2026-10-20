@@ -12,20 +12,20 @@ const LABELS = [
   { id: 'unused', description: 'No comment asks for this.' },
 ];
 
-// label, severity, convention probability, label confidence
+// label, severity, label confidence
 const PLAN = [
-  ['many-minor', 'minor', 0.9, 0.9],
-  ['many-minor', 'minor', 0.8, 0.7],
-  ['many-minor', 'nit', 0.7, 0.95],
-  ['many-minor', 'major', 0.6, 0.8],
-  ['many-minor', 'minor', 0.9, 0.6],
-  ['few-blocker', 'blocker', 0.9, 0.9],
-  ['few-blocker', 'blocker', 0.9, 0.9],
-  ['few-blocker', 'major', 0.9, 0.9],
-  ['pair', 'major', 0.9, 0.9],
-  ['pair', 'major', 0.9, 0.9],
-  ['many-minor', 'blocker', 0.3, 0.9],
-  ['none', 'nit', 0.9, 0.9],
+  ['many-minor', 'minor', 0.9],
+  ['many-minor', 'minor', 0.7],
+  ['many-minor', 'nit', 0.95],
+  ['many-minor', 'major', 0.8],
+  ['many-minor', 'minor', 0.6],
+  ['few-blocker', 'blocker', 0.9],
+  ['few-blocker', 'blocker', 0.9],
+  ['few-blocker', 'major', 0.9],
+  ['pair', 'major', 0.9],
+  ['pair', 'major', 0.9],
+  ['none', 'blocker', 0.9],
+  ['none', 'nit', 0.9],
 ];
 
 function setup() {
@@ -46,8 +46,7 @@ function setup() {
   writeFileSync(join(dir, 'labels.json'), JSON.stringify(LABELS));
   const ask = runNode('questions.mjs', ['ask', '--reviews', 'reviews.jsonl', '--labels', 'labels.json', '--out', 'questions.jsonl'], dir);
   assert.equal(ask.status, 0, ask.stderr);
-  const answers = PLAN.flatMap(([label, severity, p, labelConfidence], i) => [
-    { question_id: `forge:${i + 1}#convention`, answer: true, confidence: p, answered_by: 'judgment-model', model: 'test-model' },
+  const answers = PLAN.flatMap(([label, severity, labelConfidence], i) => [
     { question_id: `forge:${i + 1}#label`, answer: label, confidence: labelConfidence, answered_by: 'judgment-model', model: 'test-model' },
     { question_id: `forge:${i + 1}#severity`, answer: severity, confidence: 0.8, answered_by: 'agent' },
   ]);
@@ -61,10 +60,10 @@ test('ranks by count times severity, drops clusters under 3, and validates', () 
   const dir = setup();
   const r = runNode('cluster.mjs', args, dir);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /12 reviewer comments = 1 under the convention threshold \+ 1 labeled none \+ 10 kept/);
+  assert.match(r.stdout, /12 reviewer comments = 2 labeled none \+ 10 kept/);
   const out = JSON.parse(readFileSync(join(dir, 'out/clusters.json'), 'utf8'));
   assert.deepEqual(validate(loadSchema('cluster.clusters'), out), []);
-  assert.deepEqual(out.inputs, { reviews: 13, human_reviews: 12, conventions: 10, answered_by: { 'judgment-model': 24, agent: 12, human: 0 } });
+  assert.deepEqual(out.inputs, { reviews: 13, human_reviews: 12, conventions: 10, answered_by: { 'judgment-model': 12, agent: 12, human: 0 } });
   assert.deepEqual(
     out.clusters.map((c) => [c.rank, c.label, c.count, c.severity, c.score]),
     [
@@ -91,7 +90,7 @@ test('refuses answers that do not match the questions', () => {
   writeJsonl(join(dir, 'answers.jsonl'), answers);
   const r = runNode('cluster.mjs', args, dir);
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /answers do not match questions \(1 found, such as missing forge:1#convention\); run questions\.mjs check/);
+  assert.match(r.stderr, /answers do not match questions \(1 found, such as missing forge:1#label\); run questions\.mjs check/);
   assert.doesNotMatch(r.stderr, /\n\s+at /);
 });
 

@@ -29,6 +29,7 @@ test('the validator rejects what each schema forbids', () => {
 
   const answers = loadSchema('questions.answers');
   assert.deepEqual(validate(answers, { question_id: 'x', answer: true, confidence: 1.2, answered_by: 'judgment-model' }), [
+    '$.answer is boolean, expected string',
     '$.confidence is over 1',
     '$ is missing model',
   ]);

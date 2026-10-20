@@ -4,7 +4,7 @@
   "description": "The ranked conventions in .standards/clusters.json. Written by scripts/cluster.mjs, or by hand. The input to write.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["inputs", "convention_threshold", "min_count", "severity_weights", "clusters", "dropped"],
+  "required": ["inputs", "min_count", "severity_weights", "clusters", "dropped"],
   "properties": {
     "inputs": {
       "type": "object",
@@ -13,7 +13,7 @@
       "properties": {
         "reviews": { "type": "integer", "minimum": 0, "description": "Lines in reviews.jsonl." },
         "human_reviews": { "type": "integer", "minimum": 0, "description": "Lines from reviewers: author_is_bot false and author not the change_author. Only these get questions." },
-        "conventions": { "type": "integer", "minimum": 0, "description": "Comments that passed the convention threshold and carry a label other than none." },
+        "conventions": { "type": "integer", "minimum": 0, "description": "Reviewer comments whose label answer is not none." },
         "answered_by": {
           "type": "object",
           "additionalProperties": false,
@@ -25,12 +25,6 @@
           "description": "Answer counts by answerer, so a reader knows how much of the labeling a judgment model did."
         }
       }
-    },
-    "convention_threshold": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "Minimum probability that a comment states a convention. Default 0.5."
     },
     "min_count": {
       "type": "integer",

@@ -18,11 +18,12 @@ const SEVERITY_DESCRIPTIONS = {
 };
 const ANSWERERS = ['judgment-model', 'agent', 'human'];
 const LABEL_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const NONE_DESCRIPTION = 'The comment enforces none of the other conventions, or no convention at all.';
+const NONE_DESCRIPTION =
+  'The comment enforces none of the other conventions: it asks for a change to this one site only, or states no convention at all.';
 
+// A comment is a convention when its label is not none. A separate yes/no gate on whether a
+// comment generalizes passed few comments, disagreed across answerers, and hid rule-shaped ones.
 const PROMPTS = {
-  convention:
-    'Does this review comment ask for a change that applies to other code in this repo, not only to this line?',
   label: 'Which convention does this review comment enforce?',
   severity: 'How much harm would ignoring this comment cause?',
 };
@@ -99,7 +100,7 @@ export function ask(reviews, labels) {
     if (!isReviewerComment(review)) continue;
     const state = stateOf(review);
     const q = (topic, kind, extra) => ({ id: `${review.id}#${topic}`, review_id: review.id, topic, kind, prompt: PROMPTS[topic], state, ...extra });
-    questions.push(q('convention', 'yesno'), q('label', 'choice', { options, option_descriptions }), q('severity', 'score', { levels: SEVERITY_LEVELS, level_descriptions: SEVERITY_DESCRIPTIONS }));
+    questions.push(q('label', 'choice', { options, option_descriptions }), q('severity', 'score', { levels: SEVERITY_LEVELS, level_descriptions: SEVERITY_DESCRIPTIONS }));
   }
   return questions;
 }
@@ -110,7 +111,6 @@ function invalidReason(question, a) {
     return 'judgment-model answers need a model';
   }
   if (typeof a.confidence !== 'number' || a.confidence < 0 || a.confidence > 1) return 'confidence must be within 0 and 1';
-  if (question.kind === 'yesno' && typeof a.answer !== 'boolean') return 'yesno answers must be true or false';
   if (question.kind === 'choice' && !question.options.includes(a.answer)) return `${JSON.stringify(a.answer)} is not an option`;
   if (question.kind === 'score' && !question.levels.includes(a.answer)) return `${JSON.stringify(a.answer)} is not a level`;
   return null;
@@ -171,7 +171,7 @@ function main(argv) {
     const reviews = readJsonl(values.reviews, 'reviews');
     const questions = ask(reviews, readLabels(values.labels));
     writeAtomic(values.out, questions.map((q) => JSON.stringify(q)).join('\n') + (questions.length ? '\n' : ''));
-    console.log(`${questions.length} questions for ${questions.length / 3} reviewer comments (${reviews.length} reviews read); wrote ${values.out}`);
+    console.log(`${questions.length} questions for ${questions.length / 2} reviewer comments (${reviews.length} reviews read); wrote ${values.out}`);
     return 0;
   }
   if (command === 'check') {

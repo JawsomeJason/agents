@@ -7,19 +7,12 @@ import { UsageError, check, isReviewerComment, readJsonl, readLabels } from './q
 
 const USAGE =
   'usage: cluster.mjs --reviews <reviews.jsonl> --questions <questions.jsonl> --answers <answers.jsonl> --labels <labels.json> --out <clusters.json>';
-export const CONVENTION_THRESHOLD = 0.5;
 export const MIN_COUNT = 3;
 export const SEVERITY_WEIGHTS = { nit: 1, minor: 2, major: 3, blocker: 4 };
 const MAX_EXAMPLES = 5;
 const EXCERPT_MAX = 400;
 
 const round = (x) => Math.round(x * 1000) / 1000;
-
-function yesProbability(a) {
-  const p = a.distribution?.true;
-  if (typeof p === 'number') return p;
-  return a.answer === true ? a.confidence : 1 - a.confidence;
-}
 
 function excerpt(body) {
   const flat = body.replace(/\s+/g, ' ').trim();
@@ -43,20 +36,18 @@ export function cluster({ reviews, questions, answers, labels }) {
 
   const human = reviews.filter(isReviewerComment);
   const groups = new Map(labels.map((l) => [l.id, []]));
-  let below = 0;
   let none = 0;
   for (const review of human) {
-    const [convention, label, severity] = ['convention', 'label', 'severity'].map((t) => answer(review, t));
-    if (!convention || !label || !severity) throw new UsageError(`review ${review.id} lacks its three questions; rerun questions.mjs ask`);
-    if (yesProbability(convention) < CONVENTION_THRESHOLD) below++;
-    else if (label.answer === 'none') none++;
+    const [label, severity] = ['label', 'severity'].map((t) => answer(review, t));
+    if (!label || !severity) throw new UsageError(`review ${review.id} lacks its two questions; rerun questions.mjs ask`);
+    if (label.answer === 'none') none++;
     else {
       if (!labelById.has(label.answer)) throw new UsageError(`label ${label.answer} is not in the labels file`);
       groups.get(label.answer).push({ review, weight: SEVERITY_WEIGHTS[severity.answer], labelConfidence: label.confidence });
     }
   }
   const kept = [...groups.values()].reduce((n, g) => n + g.length, 0);
-  if (below + none + kept !== human.length) throw new Error('cluster counts do not reconcile with reviewer comments');
+  if (none + kept !== human.length) throw new Error('cluster counts do not reconcile with reviewer comments');
 
   const clusters = [];
   const dropped = [];
@@ -94,13 +85,12 @@ export function cluster({ reviews, questions, answers, labels }) {
   return {
     result: {
       inputs: { reviews: reviews.length, human_reviews: human.length, conventions: kept, answered_by: answeredBy },
-      convention_threshold: CONVENTION_THRESHOLD,
       min_count: MIN_COUNT,
       severity_weights: SEVERITY_WEIGHTS,
       clusters: clusters.map((c, i) => ({ rank: i + 1, ...c })),
       dropped,
     },
-    tally: { human: human.length, below, none, kept },
+    tally: { human: human.length, none, kept },
   };
 }
 
@@ -129,7 +119,7 @@ function main(argv) {
   renameSync(tmp, values.out);
   console.log(
     `${result.clusters.length} clusters kept, ${result.dropped.length} dropped. ` +
-      `${tally.human} reviewer comments = ${tally.below} under the convention threshold + ${tally.none} labeled none + ${tally.kept} kept`,
+      `${tally.human} reviewer comments = ${tally.none} labeled none + ${tally.kept} kept`,
   );
   console.log(`wrote ${values.out}`);
 }

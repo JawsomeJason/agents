@@ -38,7 +38,7 @@ function setup() {
 
 const askArgs = ['ask', '--reviews', 'reviews.jsonl', '--labels', 'labels.json', '--out', 'questions.jsonl'];
 
-test('ask writes three valid questions per reviewer comment and skips bots and the change author', () => {
+test('ask writes two valid questions per reviewer comment and skips bots and the change author', () => {
   const dir = setup();
   const r = runNode('questions.mjs', askArgs, dir);
   assert.equal(r.status, 0, r.stderr);
@@ -48,15 +48,15 @@ test('ask writes three valid questions per reviewer comment and skips bots and t
   assert.deepEqual(validate(loadSchema('questions.labels'), LABELS), []);
   assert.deepEqual(
     questions.map((q) => q.id),
-    ['forge:1#convention', 'forge:1#label', 'forge:1#severity', 'git-log:abc1234#convention', 'git-log:abc1234#label', 'git-log:abc1234#severity'],
+    ['forge:1#label', 'forge:1#severity', 'git-log:abc1234#label', 'git-log:abc1234#severity'],
   );
-  assert.deepEqual(questions[1].options, ['dto-at-boundary', 'test-behavior', 'none']);
-  assert.equal(questions[1].option_descriptions['dto-at-boundary'], LABELS[0].description);
-  assert.match(questions[1].option_descriptions.none, /none of the other conventions/);
-  assert.deepEqual(questions[2].levels, ['nit', 'minor', 'major', 'blocker']);
-  assert.deepEqual(Object.keys(questions[2].level_descriptions), questions[2].levels);
+  assert.deepEqual(questions[0].options, ['dto-at-boundary', 'test-behavior', 'none']);
+  assert.equal(questions[0].option_descriptions['dto-at-boundary'], LABELS[0].description);
+  assert.match(questions[0].option_descriptions.none, /none of the other conventions/);
+  assert.deepEqual(questions[1].levels, ['nit', 'minor', 'major', 'blocker']);
+  assert.deepEqual(Object.keys(questions[1].level_descriptions), questions[1].levels);
   assert.equal(questions[0].state, 'Comment:\nComment forge:1\n\nPath: src/a.js\n\nDiff hunk:\n@@ -1 +1 @@\n-a\n+b');
-  assert.match(questions[3].state, /^Comment:\nAddress review\n\nCommit diff:\n/);
+  assert.match(questions[2].state, /^Comment:\nAddress review\n\nCommit diff:\n/);
 
   const bytes = readFileSync(join(dir, 'questions.jsonl'), 'utf8');
   assert.equal(runNode('questions.mjs', askArgs, dir).status, 0);
@@ -65,10 +65,8 @@ test('ask writes three valid questions per reviewer comment and skips bots and t
 
 const answer = (question_id, answer, confidence = 0.9) => ({ question_id, answer, confidence, answered_by: 'agent' });
 const matching = () => [
-  answer('forge:1#convention', true),
   answer('forge:1#label', 'test-behavior'),
   answer('forge:1#severity', 'minor'),
-  answer('git-log:abc1234#convention', false),
   answer('git-log:abc1234#label', 'none'),
   answer('git-log:abc1234#severity', 'nit'),
 ];
@@ -83,17 +81,17 @@ test('check passes a matching answers file', () => {
   writeJsonl(join(dir, 'answers.jsonl'), answers);
   const r = runNode('questions.mjs', checkArgs, dir);
   assert.equal(r.status, 0, r.stdout);
-  assert.equal(r.stdout, '6 questions, 6 answers, 0 to fix or re-answer\n');
+  assert.equal(r.stdout, '4 questions, 4 answers, 0 to fix or re-answer\n');
 });
 
 test('check rejects a mismatched answers file and lists every problem', () => {
   const dir = setup();
   runNode('questions.mjs', askArgs, dir);
   const answers = matching();
-  answers.splice(5, 1);
-  answers[1] = answer('forge:1#label', 'naming');
-  answers[2] = answer('forge:1#severity', 'minor', 0.4);
-  answers.push(answer('forge:99#label', 'none'), answer('forge:1#convention', false));
+  answers.splice(3, 1);
+  answers[0] = answer('forge:1#label', 'naming');
+  answers[1] = answer('forge:1#severity', 'minor', 0.4);
+  answers.push(answer('forge:99#label', 'none'), answer('forge:1#severity', 'nit'), answer('forge:1#convention', true));
   answers.push({ question_id: 'git-log:abc1234#label', answer: 'none', confidence: 0.9, answered_by: 'judgment-model' });
   writeJsonl(join(dir, 'answers.jsonl'), answers);
   const r = runNode('questions.mjs', checkArgs, dir);
@@ -104,10 +102,11 @@ test('check rejects a mismatched answers file and lists every problem', () => {
       'invalid forge:1#label "naming" is not an option',
       'low-confidence forge:1#severity confidence 0.4',
       'unknown forge:99#label answers no question in the questions file',
-      'duplicate forge:1#convention has more than one answer',
+      'duplicate forge:1#severity has more than one answer',
+      'unknown forge:1#convention answers no question in the questions file',
       'duplicate git-log:abc1234#label has more than one answer',
       'missing git-log:abc1234#severity has no answer',
-      '6 questions, 8 answers, 6 to fix or re-answer',
+      '4 questions, 7 answers, 7 to fix or re-answer',
       '',
     ].join('\n'),
   );

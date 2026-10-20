@@ -21,7 +21,7 @@ Run from anywhere. `$D` is the data folder for one repo and `$S` is `plugins/sta
 
 ## What the numbers mean
 
-- A human comment is a convention comment when its `convention` answer gives at least 0.5 and its label is not `none`, the same rule `cluster.mjs` applies.
+- A human comment is a convention comment when its label is not `none`, the same rule `cluster.mjs` applies.
 - A finding catches a human comment when the grader says they raise the same concern. A false positive is a finding that catches no human comment. Some false positives are real problems the humans missed, so the count is an upper bound on noise.
 - An answer at exactly the threshold counts as its stated verdict, so an answerer's false at 0.5 is a no.
 - Mean tokens is the reviewer's own reported token use per review, so it counts the diff and any source the reviewer read as well as the standards.

@@ -45,15 +45,16 @@ Output `.standards/questions.jsonl`, per [the questions schema](schemas/question
 
 Script: `node <skill-dir>/scripts/questions.mjs ask --reviews .standards/reviews.jsonl --labels .standards/labels.json --out .standards/questions.jsonl`.
 
-By hand, write three questions for every reviewer comment: human, and not by the change's author. Each one's `state` holds the comment body, its path, and its diff hunk when present.
+By hand, write two questions for every reviewer comment: human, and not by the change's author. Each one's `state` holds the comment body, its path, and its diff hunk when present.
 
 | Topic | Kind | Prompt |
 | --- | --- | --- |
-| `convention` | `yesno` | Does this review comment ask for a change that applies to other code in this repo, not only to this line? |
 | `label` | `choice` | Which convention does this review comment enforce? Options are every label id plus `none`, each with its description in `option_descriptions`. |
 | `severity` | `score` | How much harm would ignoring this comment cause? Levels are `nit`, `minor`, `major`, `blocker`, each with the situation it describes in `level_descriptions`. |
 
-Done when every reviewer comment has exactly three questions.
+A comment is a convention when its label is not `none`. There is no separate yes/no question on whether a comment generalizes: answerers disagree on it, and a strict gate hides comments that a label already shows to be rule-shaped.
+
+Done when every reviewer comment has exactly two questions.
 
 ## Step 4. Answer the questions
 
@@ -61,7 +62,7 @@ Output `.standards/answers.jsonl`, per [the answers schema](schemas/questions.an
 
 A judgment model is a fast model that answers typed questions (pick one of a set, a yes/no probability, a score) with calibrated probabilities. If your environment gives you a judgment model, answer the questions file with it; otherwise answer them yourself.
 
-- Send a comment's three questions in one request when the judgment model accepts several, because they share one state.
+- Send a comment's two questions in one request when the judgment model accepts several, because they share one state.
 - Record the model's ID in `model` and set `answered_by` to `judgment-model`.
 - Set `confidence` to the probability of the chosen answer: for a choice or score, the chosen option's or level's probability. A model's own confidence figure may measure how concentrated the whole distribution is, which is not the chance this answer is right, and the check's threshold assumes the latter.
 - Keep answers whose question ids are unchanged since the last run. Re-asking costs time and money and returns the same answer.
@@ -85,14 +86,14 @@ Script: `node <skill-dir>/scripts/cluster.mjs --reviews .standards/reviews.jsonl
 
 By hand, write a short script that does each of these, because the counts decide the ranking:
 
-1. Keep a comment when its `convention` answer gives at least a 0.5 probability of yes and its `label` answer is not `none`.
+1. Keep a comment when its `label` answer is not `none`.
 2. Group the kept comments by label.
 3. Weight each comment's severity level: `nit` 1, `minor` 2, `major` 3, `blocker` 4. A cluster's `severity` is the mean weight of its comments.
 4. Move every cluster with fewer than 3 comments to `dropped`. One or two comments are one reviewer's opinion. Three show reviewers repeating themselves.
 5. Set `score` to count times severity. Sort by score, highest first, and number `rank` from 1.
 6. For each cluster, list every review id, change and path, and pick up to 5 examples that state the convention most plainly.
 
-Done when `clusters.json` validates and its counts reconcile. Every reviewer comment lands in exactly one group: under the convention threshold, labeled `none`, or kept. The three counts sum to the reviewer comment count.
+Done when `clusters.json` validates and its counts reconcile. Every reviewer comment lands in exactly one group: labeled `none`, or kept. The two counts sum to the reviewer comment count.
 
 ## Step 6. Report
 

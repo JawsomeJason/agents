@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "questions.jsonl line",
-  "description": "One typed question per line of .standards/questions.jsonl. Written by `scripts/questions.mjs ask`, or by hand. Each human review comment gets three questions: convention, label and severity.",
+  "description": "One typed question per line of .standards/questions.jsonl. Written by `scripts/questions.mjs ask`, or by hand. Each reviewer comment gets two questions: label and severity. A comment is a convention when its label answer is not none.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "review_id", "topic", "kind", "prompt", "state"],
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^.+#(convention|label|severity)$",
+      "pattern": "^.+#(label|severity)$",
       "description": "The review_id, a #, then the topic, such as forge:123456#label."
     },
     "review_id": {
@@ -17,12 +17,12 @@
       "description": "The id of the reviews.jsonl record this question is about."
     },
     "topic": {
-      "enum": ["convention", "label", "severity"],
-      "description": "convention asks whether the comment states a repo-wide convention. label asks which convention. severity asks how much harm ignoring it causes."
+      "enum": ["label", "severity"],
+      "description": "label asks which convention the comment enforces, or none. severity asks how much harm ignoring it causes."
     },
     "kind": {
-      "enum": ["yesno", "choice", "score"],
-      "description": "yesno asks for the probability a condition holds. choice picks one of options. score picks a position on ordered levels."
+      "enum": ["choice", "score"],
+      "description": "choice picks one of options. score picks a position on ordered levels."
     },
     "prompt": {
       "type": "string",
@@ -67,14 +67,6 @@
     {
       "if": { "properties": { "kind": { "const": "score" } } },
       "then": { "required": ["levels", "level_descriptions"], "allOf": [{ "not": { "required": ["options"] } }, { "not": { "required": ["option_descriptions"] } }] }
-    },
-    {
-      "if": { "properties": { "kind": { "const": "yesno" } } },
-      "then": { "allOf": [{ "not": { "required": ["options"] } }, { "not": { "required": ["option_descriptions"] } }, { "not": { "required": ["levels"] } }, { "not": { "required": ["level_descriptions"] } }] }
-    },
-    {
-      "if": { "properties": { "topic": { "const": "convention" } } },
-      "then": { "properties": { "kind": { "const": "yesno" } } }
     },
     {
       "if": { "properties": { "topic": { "const": "label" } } },

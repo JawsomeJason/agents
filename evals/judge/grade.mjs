@@ -134,10 +134,9 @@ function conventionFlags(data) {
   const answers = new Map(readJsonl(join(data, 'heldout', 'answers.jsonl')).map((a) => [a.question_id, a]));
   if (!answers.size) throw new JudgeError('heldout/answers.jsonl is missing; label the held-out comments the way mine does first');
   return (id) => {
-    const conv = answers.get(`${id}#convention`);
     const label = answers.get(`${id}#label`);
-    if (!conv || !label) throw new JudgeError(`held-out comment ${id} has no convention or label answer`);
-    return { convention: says(conv) && label.answer !== 'none', label: label.answer };
+    if (!label) throw new JudgeError(`held-out comment ${id} has no label answer`);
+    return { convention: label.answer !== 'none', label: label.answer };
   };
 }
 
