@@ -147,6 +147,9 @@
       "flags": "i",
       "patterns": [
         "\\bJawsomeJason\\b",
+        "\\bJason\\b",
+        "\\bFeatheringham\\b",
+        "jawsomejason\\.com",
         "/Users/[\\w.-]+",
         "/home/[\\w.-]+",
         "~/\\.claude\\b",
