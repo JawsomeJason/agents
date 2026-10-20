@@ -1,11 +1,20 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const scriptPath = (name) => fileURLToPath(new URL(`../skills/standards/scripts/${name}`, import.meta.url));
-export const tempDir = () => mkdtempSync(join(tmpdir(), 'standards-test-'));
+// Every temp folder a test makes is removed when the test process exits.
+const made = [];
+process.once('exit', () => {
+  for (const dir of made) rmSync(dir, { recursive: true, force: true });
+});
+export const tempDir = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'standards-test-'));
+  made.push(dir);
+  return dir;
+};
 export const readJsonl = (file) => readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
 export const writeJsonl = (file, rows) => writeFileSync(file, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
 

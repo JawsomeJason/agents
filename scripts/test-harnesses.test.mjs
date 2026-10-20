@@ -1,16 +1,25 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT = fileURLToPath(new URL('./test-harnesses.mjs', import.meta.url));
+const made = [];
+process.once('exit', () => {
+  for (const dir of made) rmSync(dir, { recursive: true, force: true });
+});
+const tempDir = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'harness-test-'));
+  made.push(dir);
+  return dir;
+};
 
 /** Runs test-harnesses in a child with one fake harness that copies a login; TMPDIR is a fresh folder. */
 function childRun(body, args = []) {
-  const dir = mkdtempSync(join(tmpdir(), 'harness-test-'));
+  const dir = tempDir();
   const tmp = join(dir, 'tmp');
   const pidFile = join(dir, 'agent.pid');
   const script = join(dir, 'child.mjs');
@@ -88,7 +97,7 @@ test('the claude harness gets only the allowlisted environment and its own token
   const saved = Object.fromEntries(Object.keys(planted).map((k) => [k, process.env[k]]));
   Object.assign(process.env, planted);
   try {
-    const tmp = mkdtempSync(join(tmpdir(), 'harness-test-'));
+    const tmp = tempDir();
     const { env } = HARNESSES.claude.setup(tmp);
     assert.equal(env.GH_TOKEN, undefined);
     assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
