@@ -57,6 +57,7 @@ Copy [the section template](../assets/section.template.md) to `references/s<area
 - **Evidence.** Cite at least 3 comments from the cluster, each with its change id, its path and a short excerpt.
 - **Applies to.** Derive globs from the cluster's paths, using their shared directories and extensions. Run `git ls-files` and keep only globs that match at least one tracked file. A glob that matches nothing never triggers its lens.
 - **Failure model.** Name each way the rule gets broken, with a default severity from the cluster's comments.
+- **Examples.** Write both examples in the repo's language, against its real types and helpers, and check that each one compiles or parses. A broken example teaches the wrong code to every agent that copies it.
 - **Heuristics.** Write patterns a reviewer can match against added lines, such as a call, an import or a missing step.
 - **Confirmed when.** Set the bar for reporting a violation, and say what evidence of an intended exception clears it.
 
