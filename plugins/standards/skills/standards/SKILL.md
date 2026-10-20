@@ -60,7 +60,7 @@ When generated standards exist, list their areas under the menu as § number and
 
 Work files live in `.standards/` at the target repo's root. Keep that folder out of version control, because review comments quote code and people. `prune.json` is the exception. It lives beside the generated standards, because `doctor` reads it there.
 
-`<skill-dir>` in the references is the folder that holds this file. The scripts in `<skill-dir>/scripts/` speed up `mine` and need only a JavaScript runtime's standard library.
+`<skill-dir>` in the references is the folder that holds this file. The scripts in `<skill-dir>/scripts/` speed up `mine` and `prune` and need only a JavaScript runtime's standard library.
 
 ## Judgment model
 
