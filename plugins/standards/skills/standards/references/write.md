@@ -87,9 +87,9 @@ List the files written, the § count per area, the homes table from step 2, the 
 
 Run it when the user wants to know whether shape B beats shape A on their repo.
 
-1. Hold out the last 20 merged changes. Run `mine` on the rest, removing the held-out changes from `reviews.jsonl` before step 2.
+1. Hold out the 20 newest merged changes that each have at least 2 inline comments from reviewers (not bots, not the change's author). Most merged changes get no inline comments, so the last 20 alone leave little to score. Run `mine` only on changes merged before the oldest held-out change was opened, so no mined comment describes code a held-out review will see. Write the standards against the repo as it stood then, for the same reason.
 2. Write shape A and shape B from the same `clusters.json`, into two separate scratch folders.
-3. For each held-out change, spawn two fresh reviewer subagents, one per shape. Give each the change's diff and only its shape's standards, and have it run `review`.
+3. For each held-out change, spawn three fresh reviewer subagents: one with no standards, and one per shape. Give each the change's diff as it stood at the commit the first reviewer comment points at, so fixes made in answer to review are not in it, plus only its own shape's standards. Have the shape reviewers run `review`. The no-standards reviewer is the baseline, because a shape that wins against the other shape but not against no standards adds nothing.
 4. Score each shape on three numbers. Recall is the share of the human convention comments on the held-out changes that the reviewer also raised. False positives are findings no human raised and the confirmed-when bar does not support, per change. Tokens loaded are the characters of every standards file the reviewer read, divided by 4, per review.
 5. Pick the winner. Higher recall wins. Recall within one caught comment across the 20 changes is a tie, settled by fewer false positives, then by fewer tokens. A tie on all three goes to A, because one description costs less context than many.
 
