@@ -13,7 +13,7 @@
     "commit": {
       "type": "string",
       "pattern": "^[0-9a-f]{7,64}$",
-      "description": "The target repo's HEAD commit the probes ran against."
+      "description": "The target repo commit every run branched from, read from the runs' base_commit. finish refuses when the runs disagree."
     },
     "sampling": {
       "type": "object",

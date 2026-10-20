@@ -672,3 +672,31 @@ test('a redone run, an edited § or a rewritten probe gets a new question id, so
   const edited = prune.verdicts(context(fx, 'rule', { sections: ['§1.1'] }), readRuns(fx.out));
   assert.equal([...edited.byRun.values()].filter((v) => v.verdict !== null).length, 0, 'an edited § re-asks every question');
 });
+
+test('grading context and prune.json come from the commit the runs branched from, not a later repo HEAD', async () => {
+  const fx = fixture();
+  writeFileSync(join(fx.repo, 'sibling.txt'), 'BEFORE\n');
+  git(fx.repo, ['add', '-A']);
+  git(fx.repo, ['commit', '-q', '-m', 'sibling']);
+  const base = git(fx.repo, ['rev-parse', 'HEAD']).trim();
+  const ctx = () => context(fx, 'rule', { sections: ['§1.1'] });
+  for (let i = 0; i < 2; i++) {
+    await step(ctx());
+    answerAll(fx, 'a');
+    answerAll(fx, 'b');
+  }
+  assert.ok(readRuns(fx.out).every((r) => r.base_commit === base));
+  writeFileSync(join(fx.repo, 'sibling.txt'), 'AFTER\n');
+  git(fx.repo, ['commit', '-q', '-am', 'later']);
+  prune.questions(ctx());
+  const state = readJsonl(join(fx.out, 'grading', 'a.questions.jsonl'))[0].state;
+  assert.match(state, /BEFORE/);
+  assert.doesNotMatch(state, /AFTER/);
+  assert.equal(finish(ctx()).record.commit, base);
+  const runs = readRuns(fx.out);
+  const moved = runs[0];
+  const { dir, ...rec } = moved;
+  writeFileSync(join(dir, 'run.json'), JSON.stringify({ ...rec, base_commit: 'abcdef1234567' }));
+  assert.throws(() => finish(ctx()), /branched from 2 commits/);
+  writeFileSync(join(dir, 'run.json'), JSON.stringify(rec));
+});

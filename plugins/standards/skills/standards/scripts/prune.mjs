@@ -703,6 +703,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
       model: got.model,
       model_pinned: Boolean(pinned),
       version: harness.version,
+      base_commit: ctx.head,
       started_at: started.toISOString(),
       finished_at: finished.toISOString(),
       duration_ms: finished - started,
@@ -885,6 +886,16 @@ export function plan(ctx) {
   return { rules: ctx.rules.length, harnesses: ctx.active.length, most };
 }
 
+/**
+ * The commit a run branched from. Runs recorded before base_commit existed take the one-commit clone's HEAD, which
+ * every run of an --out folder shares, and never the repo's HEAD, which may have moved since.
+ */
+function baseCommit(ctx, run) {
+  if (run.base_commit) return run.base_commit;
+  ctx.cachedBase ??= git(join(ctx.out, 'cache', 'base'), ['rev-parse', 'HEAD']).trim();
+  return ctx.cachedBase;
+}
+
 function writeQuestionFiles(ctx, runs, vmap) {
   const { out, graders } = ctx;
   const ruleBy = new Map(ctx.rules.map((r) => [r.section, r]));
@@ -896,7 +907,7 @@ function writeQuestionFiles(ctx, runs, vmap) {
       const v = vmap.byRun.get(runKey(r));
       if (isTiebreak && !(v.votes[graders[0]] !== undefined && v.votes[graders[1]] !== undefined && v.votes[graders[0]] !== v.votes[graders[1]])) continue;
       const rule = ruleBy.get(r.section);
-      qs.push(buildQuestion(rule, r, readFileSync(join(r.dir, 'diff.patch'), 'utf8'), siblingContext(ctx.repo, git(ctx.repo, ['rev-parse', 'HEAD']).trim(), rule.text, r.files_changed ?? []), ctx.probes.get(r.section)));
+      qs.push(buildQuestion(rule, r, readFileSync(join(r.dir, 'diff.patch'), 'utf8'), siblingContext(ctx.repo, baseCommit(ctx, r), rule.text, r.files_changed ?? []), ctx.probes.get(r.section)));
     }
     const text = qs.map((q) => JSON.stringify(q)).join('\n') + (qs.length ? '\n' : '');
     writeAtomic(graderFile(out, g, 'questions'), text);
@@ -1123,9 +1134,11 @@ export function finish(ctx) {
       complied: v.verdict, grader_confidence: primary?.confidence ?? null, votes,
     });
   }
+  const commits = [...new Set(runs.map((r) => baseCommit(ctx, r)))];
+  if (commits.length > 1) throw new UsageError(`the runs branched from ${commits.length} commits (${commits.map((c) => c.slice(0, 12)).join(', ')}); one prune.json describes one commit, so finish each in its own --out`);
   const record = {
     standards_path: ctx.standardsPath,
-    commit: git(ctx.repo, ['rev-parse', 'HEAD']).trim(),
+    commit: commits[0],
     sampling: { batch: BATCH, delete_threshold: DELETE_THRESHOLD, keep_margin: KEEP_MARGIN },
     grader: graderRecord(ctx, vmap, runs),
     provisional: isProvisional(ctx) ? provisionalReason(ctx) : null,

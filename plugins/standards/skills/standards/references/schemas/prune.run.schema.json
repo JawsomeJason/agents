@@ -13,6 +13,7 @@
     "model": { "type": ["string", "null"], "description": "The model ID the session ran on, as the harness reported it. Data only." },
     "model_pinned": { "type": "boolean", "description": "true when the run pinned the model instead of taking the harness default." },
     "version": { "type": ["string", "null"], "description": "The harness's reported version." },
+    "base_commit": { "type": "string", "pattern": "^[0-9a-f]{7,64}$", "description": "The target repo commit the run's worktree branched from. Grading context and prune.json's commit come from it, not from the repo's HEAD at grading time." },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": "string", "format": "date-time" },
     "duration_ms": { "type": "integer", "minimum": 0 },
