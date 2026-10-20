@@ -1,0 +1,345 @@
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { git, gitRepo, readJsonl, tempDir, writeJsonl } from './helpers.mjs';
+import { loadSchema, validate } from './schema.mjs';
+
+const prune = await import(fileURLToPath(new URL('../skills/standards/scripts/prune.mjs', import.meta.url)));
+const { advance, buildPrompt, checkAnswers, consensus, createContext, finish, liftOf, loadStandards, readRuns, status, step, trial, trimDiff } = prune;
+
+const H = ['alpha', 'beta'];
+/** A cell from a string such as "5/5": that many graded runs, that many complied. */
+const cell = (spec) => {
+  if (!spec) return { runs: 0, graded: [] };
+  const [c, n] = spec.split('/').map(Number);
+  return { runs: n, graded: Array.from({ length: n }, (_, i) => i < c) };
+};
+const cellsOf = (spec) => Object.fromEntries(H.map((h) => [h, {
+  none: cell(spec[h]?.none), 'one-liner': cell(spec[h]?.['one-liner']), full: cell(spec[h]?.full),
+}]));
+const both = (arms) => ({ alpha: arms, beta: arms });
+
+test('advance asks for the first none batch in every harness', () => {
+  const r = advance(cellsOf({}), H);
+  assert.deepEqual(r.needs, [{ harness: 'alpha', arm: 'none', count: 5 }, { harness: 'beta', arm: 'none', count: 5 }]);
+  assert.equal(r.state, 'open');
+});
+
+test('advance waits on grading when runs exist without verdicts', () => {
+  const cells = cellsOf(both({ none: '5/5' }));
+  cells.alpha.none.graded = cells.alpha.none.graded.slice(0, 3);
+  const r = advance(cells, H);
+  assert.deepEqual(r, { state: 'open', needs: [], pending: true });
+});
+
+test('advance runs a second none batch only when every harness complied 5 of 5', () => {
+  const r = advance(cellsOf(both({ none: '5/5' })), H);
+  assert.deepEqual(r.needs.map((n) => `${n.harness} ${n.arm} ${n.count}`), ['alpha none 5', 'beta none 5']);
+  const skipped = advance(cellsOf({ alpha: { none: '5/5' }, beta: { none: '4/5' } }), H);
+  assert.deepEqual(skipped.needs.map((n) => `${n.harness} ${n.arm} ${n.count}`), ['alpha one-liner 5', 'beta one-liner 5']);
+});
+
+test('advance deletes at 9 of 10 in every harness and not at 8', () => {
+  const del = advance(cellsOf({ alpha: { none: '10/10' }, beta: { none: '9/10' } }), H);
+  assert.equal(del.decision, 'delete');
+  const keep = advance(cellsOf({ alpha: { none: '10/10' }, beta: { none: '8/10' } }), H);
+  assert.equal(keep.state, 'open');
+  assert.deepEqual(keep.needs.map((n) => n.arm), ['one-liner', 'one-liner']);
+});
+
+test('advance keeps the one-liner when it fails at most once in every harness', () => {
+  const r = advance(cellsOf({ alpha: { none: '1/5', 'one-liner': '4/5' }, beta: { none: '0/5', 'one-liner': '5/5' } }), H);
+  assert.equal(r.decision, 'one-liner');
+});
+
+test('advance runs the full arm when the one-liner fails twice, and picks the cheapest within one of the best', () => {
+  const start = { alpha: { none: '1/5', 'one-liner': '3/5' }, beta: { none: '0/5', 'one-liner': '5/5' } };
+  assert.deepEqual(advance(cellsOf(start), H).needs, [{ harness: 'alpha', arm: 'full', count: 5 }, { harness: 'beta', arm: 'full', count: 5 }]);
+  const within = advance(cellsOf({ alpha: { ...start.alpha, full: '4/5' }, beta: { ...start.beta, full: '5/5' } }), H);
+  assert.equal(within.decision, 'one-liner', 'one-liner fails 2 and full fails 1, so one-liner is within one failure');
+  const better = advance(cellsOf({ alpha: { ...start.alpha, full: '5/5' }, beta: { ...start.beta, full: '5/5' } }), H);
+  assert.equal(better.decision, 'full', 'one-liner fails 2 and full fails 0');
+});
+
+test('advance marks a rule weak when even the best arm fails more than once', () => {
+  const r = advance(cellsOf({
+    alpha: { none: '0/5', 'one-liner': '3/5', full: '3/5' },
+    beta: { none: '2/5', 'one-liner': '5/5', full: '5/5' },
+  }), H);
+  assert.equal(r.decision, 'weak');
+  assert.match(r.reason, /alpha/);
+});
+
+test('consensus: two graders vote and a third breaks a tie', () => {
+  const g = ['a', 'b', 'c'];
+  assert.deepEqual(consensus({ a: true, b: true }, g), { verdict: true, need: [], agreed: true, tiebroken: false });
+  assert.deepEqual(consensus({ a: true }, g), { verdict: null, need: ['b'], agreed: null, tiebroken: false });
+  assert.deepEqual(consensus({ a: true, b: false }, g), { verdict: null, need: ['c'], agreed: false, tiebroken: false });
+  assert.deepEqual(consensus({ a: true, b: false, c: false }, g), { verdict: false, need: [], agreed: false, tiebroken: true });
+  assert.equal(consensus({ a: true, b: false }, ['a', 'b']).unresolved, true);
+  assert.equal(consensus({ a: false }, ['a']).verdict, false);
+});
+
+test('liftOf is compliance with the rule minus compliance without it', () => {
+  const rows = liftOf(cellsOf({ alpha: { none: '1/5', 'one-liner': '4/5' }, beta: { none: '3/5', 'one-liner': '5/5' } }), H);
+  assert.deepEqual(rows.map((r) => [r.harness, r.arm, r.lift]), [['alpha', 'one-liner', 0.6], ['beta', 'one-liner', 0.4], ['all', 'one-liner', 0.5]]);
+});
+
+test('trimDiff drops test files before source files and says what it left out', () => {
+  const src = `diff --git a/a.go b/a.go\n${'+x\n'.repeat(10)}`;
+  const tst = `diff --git a/a_test.go b/a_test.go\n${'+y\n'.repeat(10)}`;
+  const out = trimDiff(tst + src, src.length + 40);
+  assert.ok(out.includes('a.go b/a.go'));
+  assert.ok(!out.includes('a_test.go'));
+  assert.match(out, /1 more file diffs left out/);
+  assert.equal(trimDiff(src, 1000), src);
+});
+
+test('checkAnswers rejects what the answers schema forbids', () => {
+  const qs = [{ id: 'aaaaaaaaaaaa#complies' }];
+  const good = { question_id: 'aaaaaaaaaaaa#complies', answer: true, confidence: 0.8, answered_by: 'agent' };
+  assert.deepEqual(checkAnswers(qs, [good]).problems, []);
+  const bad = checkAnswers(qs, [
+    { ...good, answer: 'yes' },
+    { ...good, question_id: 'zzzzzzzzzzzz#complies' },
+    { ...good, confidence: 2 },
+    { ...good, answered_by: 'judgment-model' },
+  ]);
+  assert.deepEqual(bad.problems.map((p) => p.detail), [
+    'answer must be true or false', 'answers no question in the questions file', 'has more than one answer', 'has more than one answer',
+  ]);
+  assert.deepEqual(validate(loadSchema('prune.answers'), { ...good, answered_by: 'judgment-model' }), ['$ is missing model']);
+});
+
+// ---------------------------------------------------------------------------------------------
+// A whole run against a fake harness
+
+const INDEX = `---
+name: x-standards
+description: Test standards. Use when testing.
+metadata:
+  generator: standards
+---
+
+# Standards
+
+## §1 Naming
+
+- §1.1 Name every value for what it holds. [§1.1](references/s1-1-names.md) Read first.
+- §1.2 Keep files short. [§1.2](references/s1-2-short.md)
+`;
+
+function fixture() {
+  const repo = gitRepo([{ message: 'init', date: '2026-01-01T00:00:00Z', files: { 'main.txt': 'hello\n' } }]);
+  const dir = tempDir();
+  const standards = join(dir, 'x-standards');
+  mkdirSync(join(standards, 'references'), { recursive: true });
+  writeFileSync(join(standards, 'SKILL.md'), INDEX);
+  writeFileSync(join(standards, 'references/s1-1-names.md'), '# §1.1 Names\n\nName values for what they hold.\n');
+  writeFileSync(join(standards, 'references/s1-2-short.md'), '# §1.2 Short\n\nKeep files short.\n');
+  const probes = join(dir, 'probes.json');
+  writeFileSync(probes, JSON.stringify([{ section: '§1.1', probe: 'Add a greeting.' }, { section: '§1.2', probe: 'Add a farewell.' }]));
+  return { repo, dir, standards, probes, out: join(dir, 'out') };
+}
+
+/** An agent that follows a rule only when its prompt carries one, and fails when asked to. */
+const fakeAdapter = (mode = 'rule') => ({
+  command: 'sh',
+  auth: () => null,
+  prepare({ wt, prompt }) {
+    const follows = prompt.includes('Project rule:');
+    const line = mode === 'idle' ? '' : follows ? 'OK-named' : 'VIOLATION-named';
+    return { argv: ['-c', line ? `echo ${line} >> ${wt}/main.txt` : 'true'], env: {} };
+  },
+  collect: () => ({ message: 'done', model: 'fake-model-1', usage: null }),
+});
+
+function context(fx, mode, extra = {}) {
+  const logs = [];
+  const ctx = createContext({
+    standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a', 'b'],
+    concurrency: 2, 'prune-json': join(fx.out, 'prune.json'), log: (s) => logs.push(s), ...extra,
+  }, { fake: fakeAdapter(mode) });
+  ctx.logs = logs;
+  return ctx;
+}
+
+/** Answers every question in a grader's file: yes when the diff holds the compliant marker. */
+function answerAll(fx, grader, flip = () => false) {
+  const qs = readJsonl(join(fx.out, 'grading', `${grader}.questions.jsonl`));
+  const rows = qs.map((q) => ({ question_id: q.id, answer: q.state.includes('OK-named') !== flip(q), confidence: 0.9, answered_by: 'agent' }));
+  writeJsonl(join(fx.out, 'grading', `${grader}.answers.jsonl`), rows);
+  return qs;
+}
+
+test('loadStandards reads the index and rejects a link to a missing file', () => {
+  const fx = fixture();
+  const rules = loadStandards(fx.standards);
+  assert.deepEqual(rules.map((r) => [r.section, r.rule, r.readFirst]), [['§1.1', 'Name every value for what it holds.', true], ['§1.2', 'Keep files short.', false]]);
+  assert.equal(buildPrompt('none', rules[0], 'P'), 'P');
+  assert.equal(buildPrompt('one-liner', rules[0], 'P'), 'Project rule: Name every value for what it holds.\n\nP');
+  assert.equal(buildPrompt('full', rules[0], 'P'), `Project rule: ${rules[0].text}\n\nP`);
+  writeFileSync(join(fx.standards, 'SKILL.md'), INDEX.replace('s1-2-short', 's1-9-gone'));
+  assert.throws(() => loadStandards(fx.standards), /does not exist/);
+});
+
+test('a probe set must cover every rule', () => {
+  const fx = fixture();
+  writeFileSync(fx.probes, JSON.stringify([{ section: '§1.1', probe: 'Add a greeting.' }]));
+  assert.throws(() => createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes }, { fake: fakeAdapter() }), /no probe for §1.2/);
+});
+
+test('step, grading and finish converge on a decision, and a rerun changes nothing', async () => {
+  const fx = fixture();
+  let ctx = context(fx);
+
+  await step(ctx);
+  assert.equal(readRuns(fx.out).length, 10, 'none arm: 5 runs for each of 2 rules');
+  assert.ok(readRuns(fx.out).every((r) => r.arm === 'none' && r.model === 'fake-model-1'));
+  const qs = readJsonl(join(fx.out, 'grading', 'a.questions.jsonl'));
+  assert.equal(qs.length, 10);
+  for (const q of qs) assert.deepEqual(validate(loadSchema('prune.questions'), q), []);
+  assert.ok(qs.every((q) => !/none|one-liner|full|fake/.test(q.id)), 'ids do not reveal the arm or harness');
+
+  ctx = context(fx);
+  await step(ctx);
+  assert.equal(readRuns(fx.out).length, 10, 'nothing new runs while the outputs await grading');
+  assert.match(ctx.logs.join('\n'), /0 runs to do, 2 rules waiting on grading/);
+
+  answerAll(fx, 'a');
+  answerAll(fx, 'b');
+  ctx = context(fx);
+  await step(ctx);
+  assert.equal(readRuns(fx.out).filter((r) => r.arm === 'one-liner').length, 10, 'none complied 0 of 5, so one-liner runs next');
+
+  answerAll(fx, 'a');
+  answerAll(fx, 'b');
+  ctx = context(fx);
+  const before = readRuns(fx.out).length;
+  await step(ctx);
+  assert.equal(readRuns(fx.out).length, before, 'both rules are decided, so step runs nothing');
+  assert.match(ctx.logs.join('\n'), /2 rules decided, 0 runs to do/);
+
+  const { record } = finish(ctx);
+  assert.deepEqual(validate(loadSchema('prune'), record), []);
+  assert.deepEqual(record.rules.map((r) => [r.section, r.decision, r.provisional]), [['§1.1', 'one-liner', true], ['§1.2', 'one-liner', true]]);
+  assert.deepEqual(record.rules[0].tallies, [
+    { harness: 'fake', arm: 'none', runs: 5, complied: 0 },
+    { harness: 'fake', arm: 'one-liner', runs: 5, complied: 5 },
+  ]);
+  assert.deepEqual(record.rules[0].lift, [{ harness: 'fake', arm: 'one-liner', none: 0, with: 1, lift: 1 }, { harness: 'all', arm: 'one-liner', none: 0, with: 1, lift: 1 }]);
+  assert.equal(record.grader.kind, 'consensus');
+  assert.deepEqual(record.grader.consensus, { graders: ['a', 'b'], outputs: 20, agreed: 20, agreement: 1, tiebroken: 0 });
+  assert.equal(record.grader.calibration, null);
+  assert.equal(record.harnesses[0].model, 'fake-model-1');
+  assert.equal(record.runs.length, 20);
+  for (const run of readRuns(fx.out)) {
+    const { dir, ...rest } = run;
+    assert.deepEqual(validate(loadSchema('prune.run'), rest), []);
+    assert.match(readFileSync(join(dir, 'diff.patch'), 'utf8'), /named/);
+  }
+
+  const first = readFileSync(join(fx.out, 'prune.json'), 'utf8');
+  finish(context(fx));
+  assert.equal(readFileSync(join(fx.out, 'prune.json'), 'utf8'), first, 'finish is idempotent');
+});
+
+test('a split between the first two graders goes to the tiebreaker', async () => {
+  const fx = fixture();
+  let ctx = context(fx, 'rule', { graders: ['a', 'b', 'c'], sections: ['§1.1'] });
+  await step(ctx);
+  const qs = answerAll(fx, 'a');
+  answerAll(fx, 'b', (q) => q.id === qs[0].id);
+  ctx = context(fx, 'rule', { graders: ['a', 'b', 'c'], sections: ['§1.1'] });
+  await step(ctx);
+  const tie = readJsonl(join(fx.out, 'grading', 'c.questions.jsonl'));
+  assert.deepEqual(tie.map((q) => q.id), [qs[0].id], 'only the split output reaches the tiebreaker');
+  writeJsonl(join(fx.out, 'grading', 'c.answers.jsonl'), [{ question_id: qs[0].id, answer: false, confidence: 0.7, answered_by: 'agent' }]);
+  const split = [...prune.verdicts(ctx, readRuns(fx.out)).byRun.values()].find((v) => v.id === qs[0].id);
+  assert.deepEqual([split.verdict, split.tiebroken, split.agreed], [false, true, false]);
+  status(ctx);
+  assert.match(ctx.logs.at(-1), /^§1\.1 needs fake one-liner x5 \| fake: none 0\/5$/, 'the tiebroken output counts as graded, so the none batch is complete');
+});
+
+test('a harness that changes nothing is retried, logged and does not hang the step', async () => {
+  const fx = fixture();
+  const ctx = context(fx, 'idle', { sections: ['§1.1'], concurrency: 1 });
+  await step(ctx);
+  assert.equal(readRuns(fx.out).length, 0);
+  const failures = readJsonl(join(fx.out, 'failures.jsonl'));
+  assert.equal(failures.length, 15, '5 runs, 3 attempts each');
+  assert.match(failures[0].reason, /no changes/);
+});
+
+test('a trial keeps its output apart from the counted runs', async () => {
+  const fx = fixture();
+  const ctx = context(fx);
+  const r = await trial(ctx, '§1.1', 'fake');
+  assert.ok(existsSync(join(r.dest, 'diff.patch')));
+  assert.equal(readRuns(fx.out).length, 0);
+  assert.ok(r.dest.includes('trial'));
+});
+
+test('worktrees hold only the checkout: no remote, one commit, and the standards folder removed', async () => {
+  const fx = fixture();
+  git(fx.repo, ['config', 'user.email', 'a@b.c']);
+  const nested = join(fx.repo, 'x-standards');
+  mkdirSync(nested);
+  writeFileSync(join(nested, 'SKILL.md'), INDEX);
+  mkdirSync(join(nested, 'references'));
+  writeFileSync(join(nested, 'references/s1-1-names.md'), '# §1.1\n');
+  writeFileSync(join(nested, 'references/s1-2-short.md'), '# §1.2\n');
+  git(fx.repo, ['add', '-A']);
+  git(fx.repo, ['commit', '-q', '-m', 'add standards']);
+  const ctx = context(fx, 'rule', { standards: nested, sections: ['§1.1'] });
+  assert.equal(ctx.standardsRel, 'x-standards');
+  const adapter = fakeAdapter();
+  let seen = null;
+  adapter.prepare = ({ wt, prompt }) => {
+    seen = { wt, standards: existsSync(join(wt, 'x-standards')), prompt };
+    return { argv: ['-c', `git -C ${wt} remote | wc -l | tr -d " " > ${wt}/remotes.txt; git -C ${wt} rev-list --all | wc -l | tr -d " " > ${wt}/commits.txt; echo "pwd=$PWD" > ${wt}/pwd.txt`], env: {} };
+  };
+  const ctx2 = createContext({ standards: nested, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a'], sections: ['§1.1'], log: () => {} }, { fake: adapter });
+  const r = await trial(ctx2, '§1.1', 'fake');
+  assert.equal(seen.standards, false);
+  const diff = readFileSync(join(r.dest, 'diff.patch'), 'utf8');
+  assert.match(diff, /\+0\n/, 'no remote');
+  assert.match(diff, /\+1\n/, 'one commit');
+  assert.ok(diff.includes(`+pwd=${seen.wt}\n`), 'the agent starts in its worktree, not the directory the runner started in');
+});
+
+test('a scoped step ignores the runs of rules outside its scope', async () => {
+  const fx = fixture();
+  await step(context(fx));
+  assert.equal(readRuns(fx.out).length, 10);
+  const scoped = context(fx, 'rule', { sections: ['§1.2'] });
+  await step(scoped);
+  assert.equal(readJsonl(join(fx.out, 'grading', 'a.questions.jsonl')).length, 5, 'only the scoped rule is asked about');
+  assert.equal(prune.scopedRuns(scoped).length, 5);
+});
+
+test('a throttled provider is waited out without spending attempts or leaving a hole', async () => {
+  const fx = fixture();
+  const adapter = fakeAdapter();
+  const ok = adapter.prepare;
+  let calls = 0;
+  adapter.prepare = (a) => (++calls <= 4 ? { argv: ['-c', 'echo \'{"status":429,"message":"Rate limit exceeded"}\'; exit 1'], env: {} } : ok(a));
+  const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a'], sections: ['§1.1'], concurrency: 1, 'backoff-sec': '0', log: () => {} }, { fake: adapter });
+  ctx.backoffMs = 0;
+  await step(ctx);
+  const failures = readJsonl(join(fx.out, 'failures.jsonl'));
+  assert.deepEqual([...new Set(failures.map((f) => f.kind))], ['throttled']);
+  assert.equal(failures.length, 4, 'four throttled attempts, more than the 3 a failing run gets');
+  assert.equal(readRuns(fx.out).length, 5, 'every run of the batch still happened');
+});
+
+test('questions writes the grading files for the runs on disk and runs nothing', async () => {
+  const fx = fixture();
+  await step(context(fx, 'rule', { sections: ['§1.1'] }));
+  rmSync(join(fx.out, 'grading'), { recursive: true });
+  const files = prune.questions(context(fx, 'idle', { sections: ['§1.1'] }));
+  assert.deepEqual(files.a, { questions: 5, unanswered: 5 });
+  assert.equal(readRuns(fx.out).length, 5);
+});
