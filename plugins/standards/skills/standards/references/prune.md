@@ -100,7 +100,7 @@ Write `prune.json` into the standards folder, beside its `SKILL.md`, per [the pr
 
 Grade with the context a reviewer would have. `step` adds to each question the files the rule points at and the changed files' sibling files from the checkout the runs branched from, because a rule such as "match the sibling" cannot be judged from the diff alone.
 
-Mark a decision provisional when it rests on fewer harnesses than are installed or on a grader that did not pass calibration. A rerun with the missing harness replaces it.
+Mark a decision provisional when it rests on fewer harnesses than were requested: the ones `--harnesses` names, or every harness the runner knows when it names none. A requested harness that was skipped, not on PATH or not logged in did not run. A rerun with the missing harness replaces the decision. No rule is decided without counted runs: with no harness able to run, `status` shows every rule undecided and `finish` refuses to write `prune.json`.
 
 A rule pruned on one model may be needed on the next one. `doctor` compares these model IDs with each harness's default and flags the record as stale when they differ. `write` reads the `delete` decisions so it does not write a deleted rule back.
 

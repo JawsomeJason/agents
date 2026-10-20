@@ -164,6 +164,8 @@ export function buildPrompt(arm, rule, probe) {
  * or the decision.
  */
 export function advance(cells, harnesses) {
+  // every() is true on an empty list, so with no harness each rule below would pass on zero runs.
+  if (!harnesses.length) return { state: 'open', needs: [], pending: false, blocked: 'no harness ran' };
   const needs = [];
   let pending = false;
   const ensure = (arm, target) => {
@@ -757,6 +759,7 @@ export function createContext(opts, adapters = ADAPTERS) {
   }));
   return {
     standardsDir, repo, out, rules, probes, harnesses, models,
+    requested: opts.harnesses?.length ? opts.harnesses : Object.keys(adapters),
     active: harnesses.filter((h) => h.status === 'ran'),
     activeNames: harnesses.filter((h) => h.status === 'ran').map((h) => h.name),
     standardsRel: rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel : null,
@@ -949,8 +952,8 @@ export function status(ctx) {
       const c = st.cells[h][a];
       return c.runs ? `${a} ${c.graded.filter(Boolean).length}/${c.graded.length}${c.runs > c.graded.length ? `+${c.runs - c.graded.length}?` : ''}` : null;
     }).filter(Boolean).join(' ')).map((t, i) => `${ctx.activeNames[i]}: ${t || '-'}`).join(' | ');
-    const where = st.state === 'decided' ? `decided ${st.decision}` : st.pending ? 'waits on grading' : `needs ${st.needs.map((n) => `${n.harness} ${n.arm} x${n.count}`).join(', ')}`;
-    lines.push(`${rule.section} ${where} | ${tally}`);
+    const where = st.state === 'decided' ? `decided ${st.decision}` : st.blocked ? `undecided: ${st.blocked}` : st.pending ? 'waits on grading' : `needs ${st.needs.map((n) => `${n.harness} ${n.arm} x${n.count}`).join(', ')}`;
+    lines.push(tally ? `${rule.section} ${where} | ${tally}` : `${rule.section} ${where}`);
   }
   for (const l of lines) ctx.log(l);
   return lines;
@@ -965,6 +968,7 @@ function harnessRecords(ctx, runs) {
 }
 
 export function finish(ctx) {
+  if (!ctx.active.length) throw new UsageError('no harness can run; nothing to decide');
   if (!ctx.graders.length) throw new UsageError('--graders is required for finish');
   const runs = scopedRuns(ctx);
   const vmap = verdicts(ctx, runs);
@@ -1045,10 +1049,11 @@ export function reconcile(record) {
   return out;
 }
 
-const isProvisional = (ctx) => ctx.harnesses.some((h) => h.status !== 'ran') || ctx.active.length < 3;
+const missingRequested = (ctx) => ctx.harnesses.filter((h) => ctx.requested.includes(h.name) && h.status !== 'ran');
+const isProvisional = (ctx) => missingRequested(ctx).length > 0;
 const provisionalReason = (ctx) => {
-  const skipped = ctx.harnesses.filter((h) => h.status !== 'ran').map((h) => `${h.name} (${h.reason})`);
-  return `Decided on ${ctx.active.length} harnesses${skipped.length ? `; skipped: ${skipped.join(', ')}` : ''}. Rerun step and finish with the skipped harnesses to confirm.`;
+  const missing = missingRequested(ctx).map((h) => `${h.name} (${h.reason})`);
+  return `Decided on ${ctx.active.length} of ${ctx.requested.length} requested harnesses; did not run: ${missing.join(', ')}. Rerun step and finish with them to confirm.`;
 };
 
 function graderRecord(ctx, vmap, runs) {

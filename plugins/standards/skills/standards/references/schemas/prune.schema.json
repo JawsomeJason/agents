@@ -27,7 +27,7 @@
     },
     "provisional": {
       "type": ["string", "null"],
-      "description": "Why the decisions may change, such as a harness that was skipped. null when every harness ran and the grader passed calibration."
+      "description": "Why the decisions may change: a requested harness that did not run, because it was skipped, not on PATH or not logged in. null when every requested harness ran."
     },
     "grader": {
       "type": "object",
@@ -107,7 +107,7 @@
             "enum": ["delete", "one-liner", "full", "weak"],
             "description": "delete: the no-rule arm complied at least 90% in every harness. one-liner: the index line is enough. full: the § must be read before writing. weak: even the best arm fails more than once per batch, so the rule needs a check a tool runs."
           },
-          "provisional": { "type": "boolean", "description": "true when the decision rests on fewer harnesses than the sampling assumes, or on a grader that did not pass calibration." },
+          "provisional": { "type": "boolean", "description": "true when the decision rests on fewer harnesses than were requested." },
           "lift": {
             "type": "array",
             "description": "Compliance with the rule minus compliance without it, for each rule arm that ran, per harness and pooled over harnesses (harness all). The writing-side value of the rule. Empty for a deleted rule, because its rule arms never ran.",

@@ -224,7 +224,8 @@ test('step, grading and finish converge on a decision, and a rerun changes nothi
 
   const { record } = finish(ctx);
   assert.deepEqual(validate(loadSchema('prune'), record), []);
-  assert.deepEqual(record.rules.map((r) => [r.section, r.decision, r.provisional]), [['§1.1', 'one-liner', true], ['§1.2', 'one-liner', true]]);
+  assert.deepEqual(record.rules.map((r) => [r.section, r.decision, r.provisional]), [['§1.1', 'one-liner', false], ['§1.2', 'one-liner', false]]);
+  assert.equal(record.provisional, null, 'the one requested harness ran');
   assert.deepEqual(record.rules[0].tallies, [
     { harness: 'fake', arm: 'none', runs: 5, complied: 0 },
     { harness: 'fake', arm: 'one-liner', runs: 5, complied: 5 },
@@ -244,6 +245,42 @@ test('step, grading and finish converge on a decision, and a rerun changes nothi
   const first = readFileSync(join(fx.out, 'prune.json'), 'utf8');
   finish(context(fx));
   assert.equal(readFileSync(join(fx.out, 'prune.json'), 'utf8'), first, 'finish is idempotent');
+});
+
+test('advance decides nothing when no harness ran', () => {
+  assert.deepEqual(advance({}, []), { state: 'open', needs: [], pending: false, blocked: 'no harness ran' });
+});
+
+test('with the only requested harness skipped, status leaves every rule undecided and finish writes nothing', () => {
+  const fx = fixture();
+  const ctx = context(fx, 'rule', { skip: ['fake:not logged in'] });
+  assert.deepEqual(ctx.activeNames, []);
+  status(ctx);
+  assert.deepEqual(ctx.logs, ['§1.1 undecided: no harness ran', '§1.2 undecided: no harness ran']);
+  assert.throws(() => finish(ctx), /no harness can run; nothing to decide/);
+  assert.equal(existsSync(join(fx.out, 'prune.json')), false);
+});
+
+/** Steps and answers until every scoped rule is decided, then finishes. */
+async function runToDecision(fx, makeCtx) {
+  for (let i = 0; i < 4; i++) {
+    await step(makeCtx());
+    for (const g of makeCtx().graders) answerAll(fx, g);
+  }
+  return finish(makeCtx()).record;
+}
+
+test('a rule decided on fewer harnesses than were requested is provisional', async () => {
+  const fx = fixture();
+  const adapters = { fake: fakeAdapter(), other: fakeAdapter() };
+  const makeCtx = () => createContext({
+    standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake', 'other'], skip: ['other:not logged in'],
+    graders: ['a', 'b'], sections: ['§1.1'], 'prune-json': join(fx.out, 'prune.json'), log: () => {},
+  }, adapters);
+  const record = await runToDecision(fx, makeCtx);
+  assert.deepEqual(record.rules.map((r) => [r.section, r.decision, r.provisional]), [['§1.1', 'one-liner', true]]);
+  assert.match(record.provisional, /^Decided on 1 of 2 requested harnesses; did not run: other \(not logged in\)/);
+  assert.deepEqual(validate(loadSchema('prune'), record), []);
 });
 
 test('a split between the first two graders goes to the tiebreaker', async () => {
