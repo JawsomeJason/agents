@@ -732,3 +732,18 @@ test('finish --calibration scores the first grader against human labels, and onl
   writeJsonl(labels, answers.slice(0, 29).map((a) => ({ question_id: a.question_id, complies: a.answer })));
   assert.throws(() => finish(makeCtx({ calibration: labels })), /holds 29 labels; calibration needs at least 30/);
 });
+
+test('an adapter that always runs one model records its runs as pinned, with the reason, and the summary says so', async () => {
+  const fx = fixture();
+  const adapter = { ...fakeAdapter(), pin: { model: () => 'forced-model-1', reason: 'adapter default: test' }, collect: ({ model }) => ({ message: 'done', model, usage: null }) };
+  let seen = null;
+  const prepare = adapter.prepare;
+  adapter.prepare = (a) => { seen = a.model; return prepare(a); };
+  const makeCtx = () => createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a', 'b'], sections: ['§1.1'], 'prune-json': join(fx.out, 'prune.json'), log: () => {} }, { fake: adapter });
+  const record = await runToDecision(fx, makeCtx);
+  assert.equal(seen, 'forced-model-1');
+  assert.ok(readRuns(fx.out).every((r) => r.model === 'forced-model-1' && r.model_pinned === true && r.pin_reason === 'adapter default: test'));
+  assert.deepEqual([record.harnesses[0].model_pinned, record.harnesses[0].pin_reason], [true, 'adapter default: test']);
+  assert.deepEqual(validate(loadSchema('prune'), record), []);
+  assert.match(prune.summaryTable(makeCtx(), record), /\nfake ran forced-model-1, pinned \(adapter default: test\), not its default\.\n$/);
+});

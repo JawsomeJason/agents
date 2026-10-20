@@ -506,7 +506,8 @@ export const ADAPTERS = {
   opencode: {
     command: 'opencode',
     // OAuth providers do not route from a temp home, so the run uses a model served by opencode's own provider.
-    model: () => process.env.PRUNE_OPENCODE_MODEL ?? 'opencode/big-pickle',
+    // That is a pin, not the harness default, and the runs record it as one.
+    pin: { model: () => process.env.PRUNE_OPENCODE_MODEL ?? 'opencode/big-pickle', reason: 'adapter default: OAuth providers do not route from a temp home' },
     auth: () => (existsSync(join(HOME, '.local/share/opencode/auth.json')) ? null : 'not logged in (no auth.json)'),
     prepare({ tmp, prompt, model }) {
       const dirs = { home: join(tmp, 'home'), config: join(tmp, 'config'), data: join(tmp, 'data'), cache: join(tmp, 'cache'), state: join(tmp, 'state') };
@@ -514,13 +515,14 @@ export const ADAPTERS = {
       copyFileSync(join(HOME, '.local/share/opencode/auth.json'), join(dirs.data, 'opencode/auth.json'));
       tempHome(dirs.home);
       return {
-        argv: ['run', '--standalone', '--auto', '--format', 'json', '-m', model ?? ADAPTERS.opencode.model(), prompt],
+        argv: ['run', '--standalone', '--auto', '--format', 'json', '-m', model, prompt],
         env: { HOME: dirs.home, XDG_CONFIG_HOME: dirs.config, XDG_DATA_HOME: dirs.data, XDG_CACHE_HOME: dirs.cache, XDG_STATE_HOME: dirs.state },
       };
     },
-    collect({ stdout }) {
+    // Its JSON events name no model, so the record carries the model the run was started with.
+    collect({ stdout, model }) {
       const texts = jsonLines(stdout).filter((e) => e.type === 'text').map((e) => e.part?.text ?? '');
-      return { message: texts.at(-1) ?? '', model: ADAPTERS.opencode.model(), usage: null };
+      return { message: texts.at(-1) ?? '', model, usage: null };
     },
   },
   claude: {
@@ -673,6 +675,12 @@ export function captureDiff(wt, head, standardsRel = null) {
  * One agent session in a temp home and a fresh worktree. Returns the finished run record, or
  * { failed } when the session produced nothing usable.
  */
+/** The model a harness is pinned to and why: --model first, then the adapter's own pin; null runs the harness default. */
+function pinFor(ctx, harness) {
+  if (ctx.models.has(harness.name)) return { model: ctx.models.get(harness.name), reason: '--model' };
+  return harness.adapter.pin ? { model: harness.adapter.pin.model(), reason: harness.adapter.pin.reason } : null;
+}
+
 export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
   ctx.scratch ??= privateDir(ctx.tmpRoot);
   const tmp = mkdtempSync(join(ctx.scratch.dir, 'run-'));
@@ -683,13 +691,14 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
     if (ctx.standardsRel) rmSync(join(wt, ctx.standardsRel), { recursive: true, force: true });
     const prompt = buildPrompt(arm, rule, ctx.probes.get(rule.section));
     const writable = ctx.writable;
-    const pinned = ctx.models.get(harness.name) ?? null;
+    const pin = pinFor(ctx, harness);
+    const pinned = pin?.model ?? null;
     const { argv, env } = harness.adapter.prepare({ tmp, scratch: ctx.scratch.dir, wt, prompt, writable, model: pinned });
     // Some harnesses take their working directory from $PWD, which a spawn does not update.
     const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: harnessEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
     if (res.code !== 0 && THROTTLED.test(`${res.stdout}\n${res.stderr}`)) return { failed: `throttled${tail(res)}`, throttled: true, log: `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX) };
     const { diff, files } = captureDiff(wt, ctx.head, ctx.standardsRel);
-    const got = harness.adapter.collect({ tmp, stdout: res.stdout, stderr: res.stderr });
+    const got = harness.adapter.collect({ tmp, stdout: res.stdout, stderr: res.stderr, model: pinned });
     const finished = new Date();
     const log = `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX);
     if (res.timedOut) return { failed: `timed out after ${Math.round(ctx.timeoutMs / 60000)} minutes`, log };
@@ -707,6 +716,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
       run: runNumber,
       model: got.model,
       model_pinned: Boolean(pinned),
+      pin_reason: pin?.reason ?? null,
       version: harness.version,
       base_commit: ctx.head,
       started_at: started.toISOString(),
@@ -1093,7 +1103,12 @@ function harnessRecords(ctx, runs) {
   return ctx.harnesses.map((h) => {
     const model = runs.filter((r) => r.harness === h.name && r.model).map((r) => r.model);
     const models = [...new Set(model)];
-    return { name: h.name, version: h.version, model: models.length === 1 ? models[0] : models.length ? models.join(' | ') : null, model_pinned: ctx.models.has(h.name), status: h.status, reason: h.reason };
+    const pins = [...new Set(runs.filter((r) => r.harness === h.name && r.model_pinned).map((r) => r.pin_reason ?? '--model'))];
+    const pinned = pins.length > 0 || ctx.models.has(h.name);
+    return {
+      name: h.name, version: h.version, model: models.length === 1 ? models[0] : models.length ? models.join(' | ') : null, model_pinned: pinned,
+      ...(pinned ? { pin_reason: pins.join(' | ') || '--model' } : {}), status: h.status, reason: h.reason,
+    };
   });
 }
 
@@ -1255,7 +1270,9 @@ export function summaryTable(ctx, record) {
     return [`${r.section} ${r.rule.slice(0, 60)}${r.rule.length > 60 ? '...' : ''}`, ...names.flatMap((h) => ARMS.map((a) => cell(h, a))), liftText, `${r.decision}${r.provisional ? ' (provisional)' : ''}`];
   });
   const line = (cols) => `| ${cols.join(' | ')} |`;
-  return [line(head), line(head.map(() => '---')), ...rows.map(line)].join('\n') + '\n';
+  // A pinned harness's tallies say nothing about the model its users get by default.
+  const pins = record.harnesses.filter((h) => h.model_pinned && names.includes(h.name)).map((h) => `${h.name} ran ${h.model ?? 'an unknown model'}, pinned (${h.pin_reason}), not its default.`);
+  return [line(head), line(head.map(() => '---')), ...rows.map(line), ...(pins.length ? ['', ...pins] : [])].join('\n') + '\n';
 }
 
 // ---------------------------------------------------------------------------------------------

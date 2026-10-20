@@ -87,6 +87,7 @@
           "version": { "type": ["string", "null"], "description": "The harness's reported version." },
           "model": { "type": ["string", "null"], "description": "The model ID the harness ran on. Data only." },
           "model_pinned": { "type": "boolean", "description": "true when the run pinned this model instead of the harness default. A pinned model says nothing about the default, so doctor cannot call it stale against the default. Absent means the default." },
+          "pin_reason": { "type": "string", "description": "Why the model was pinned: --model, or the adapter's reason when it always runs one model. Present only when model_pinned is true." },
           "status": { "enum": ["ran", "skipped"], "description": "skipped when it could not authenticate or run headless. A skipped harness never counts as complying." },
           "reason": { "type": ["string", "null"], "description": "Why it was skipped. null when it ran." }
         }
