@@ -48,7 +48,7 @@ export const DELETE_THRESHOLD = 0.9;
 export const KEEP_MARGIN = 1;
 const RULE_ARMS = ['one-liner', 'full'];
 const MAX_FAILURES_PER_CELL = 8;
-const MAX_THROTTLES_PER_RUN = 10;
+const MAX_THROTTLES_PER_RUN = 3;
 // A provider that refuses work for lack of quota says so on a failed exit; the agent's own prose never sets the exit code.
 const THROTTLED = /"status":\s*429|rate limit|usage limit|provider\.quota|too many requests/i;
 const DIFF_STORE_MAX = 1_000_000;
@@ -407,6 +407,9 @@ export const ADAPTERS = {
 export function detectHarnesses(names, skips, adapters = ADAPTERS) {
   const chosen = names?.length ? names : Object.keys(adapters);
   const out = [];
+  for (const name of Object.keys(adapters).filter((n) => !chosen.includes(n))) {
+    out.push({ name, status: 'skipped', reason: skips.get(name) ?? 'not requested', version: null, adapter: adapters[name] });
+  }
   for (const name of chosen) {
     const adapter = adapters[name];
     if (!adapter) throw new UsageError(`no adapter for harness ${name}; known: ${Object.keys(adapters).join(', ')}`);
@@ -576,10 +579,10 @@ export function readRuns(out) {
   return runs;
 }
 
-/** The finished runs for the rules in scope; runs of other rules on disk wait for their own scope. */
+/** The finished runs for the rules and harnesses in scope. Runs of anything else stay on disk, ready for a later scope. */
 export const scopedRuns = (ctx) => {
   const sections = new Set(ctx.rules.map((r) => r.section));
-  return readRuns(ctx.out).filter((r) => sections.has(r.section));
+  return readRuns(ctx.out).filter((r) => sections.has(r.section) && ctx.activeNames.includes(r.harness));
 };
 
 const runDir = (out, section, harness, arm, n) => join(runsDir(out), sectionSlug(section), harness, arm, String(n).padStart(2, '0'));
@@ -677,6 +680,7 @@ export function createContext(opts, adapters = ADAPTERS) {
     graders: opts.graders ?? [],
     concurrency: Number(opts.concurrency ?? 3),
     backoffMs: Number(opts['backoff-sec'] ?? 30) * 1000,
+    halted: new Set(),
     timeoutMs: Number(opts['timeout-min'] ?? 25) * 60_000,
     tmpRoot: opts['tmp-root'] ?? tmpdir(),
     env,
@@ -793,6 +797,7 @@ async function oneJob(ctx, j) {
   const label = `${j.rule.section} ${j.harness.name} ${j.arm} #${j.number}`;
   let throttles = 0;
   for (let attempt = 1; attempt <= 3;) {
+    if (ctx.halted.has(j.harness.name)) return;
     rmSync(dest, { recursive: true, force: true });
     const r = await executeRun(ctx, j.harness, j.rule, j.arm, j.number, { dest });
     if (r.record) {
@@ -809,7 +814,11 @@ async function oneJob(ctx, j) {
       continue;
     }
     // A throttled provider is not a bad run: wait it out instead of spending an attempt or leaving a hole in the batch.
-    if (++throttles > MAX_THROTTLES_PER_RUN) return;
+    if (++throttles > MAX_THROTTLES_PER_RUN) {
+      ctx.halted.add(j.harness.name);
+      ctx.log(`halted ${j.harness.name}: the provider keeps refusing work. Runs that finished are kept; rerun step when it recovers.`);
+      return;
+    }
     await new Promise((done) => setTimeout(done, Math.min(ctx.backoffMs * 2 ** (throttles - 1), 8 * 60_000)));
   }
 }

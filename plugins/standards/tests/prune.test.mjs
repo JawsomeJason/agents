@@ -320,19 +320,20 @@ test('a scoped step ignores the runs of rules outside its scope', async () => {
   assert.equal(prune.scopedRuns(scoped).length, 5);
 });
 
-test('a throttled provider is waited out without spending attempts or leaving a hole', async () => {
+test('a provider that keeps refusing halts its harness and the step ends', async () => {
   const fx = fixture();
   const adapter = fakeAdapter();
   const ok = adapter.prepare;
   let calls = 0;
-  adapter.prepare = (a) => (++calls <= 4 ? { argv: ['-c', 'echo \'{"status":429,"message":"Rate limit exceeded"}\'; exit 1'], env: {} } : ok(a));
+  adapter.prepare = (a) => (++calls <= 99 ? { argv: ['-c', 'echo \'{"status":429,"message":"Rate limit exceeded"}\'; exit 1'], env: {} } : ok(a));
   const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a'], sections: ['§1.1'], concurrency: 1, 'backoff-sec': '0', log: () => {} }, { fake: adapter });
   ctx.backoffMs = 0;
   await step(ctx);
   const failures = readJsonl(join(fx.out, 'failures.jsonl'));
   assert.deepEqual([...new Set(failures.map((f) => f.kind))], ['throttled']);
-  assert.equal(failures.length, 4, 'four throttled attempts, more than the 3 a failing run gets');
-  assert.equal(readRuns(fx.out).length, 5, 'every run of the batch still happened');
+  assert.equal(failures.length, 4, 'one try and three waited retries, then the harness halts');
+  assert.ok(ctx.halted.has('fake'));
+  assert.equal(readRuns(fx.out).length, 0, 'a halted harness runs nothing more');
 });
 
 test('questions writes the grading files for the runs on disk and runs nothing', async () => {
@@ -342,4 +343,13 @@ test('questions writes the grading files for the runs on disk and runs nothing',
   const files = prune.questions(context(fx, 'idle', { sections: ['§1.1'] }));
   assert.deepEqual(files.a, { questions: 5, unanswered: 5 });
   assert.equal(readRuns(fx.out).length, 5);
+});
+
+test('a harness the caller did not name is recorded as skipped, with the caller\'s reason or not requested', () => {
+  const fx = fixture();
+  const adapters = { fake: fakeAdapter(), other: fakeAdapter() };
+  const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], skip: ['third:waiting'], graders: ['a'], log: () => {} }, { ...adapters, third: fakeAdapter() });
+  const byName = Object.fromEntries(ctx.harnesses.map((h) => [h.name, [h.status, h.reason]]));
+  assert.deepEqual(byName, { other: ['skipped', 'not requested'], third: ['skipped', 'waiting'], fake: ['ran', null] });
+  assert.deepEqual(ctx.activeNames, ['fake']);
 });
