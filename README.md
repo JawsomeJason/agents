@@ -6,12 +6,22 @@ Agent skills that run in any harness that reads the [Agent Skills spec](https://
 
 | Plugin | What it does |
 | --- | --- |
-| `standards` | Mines a repo's review history into coding standards, each with its reason and the review comments behind it, then reviews diffs against them and prunes the rules agents already follow. |
+| `standards` | Mines a repo's review history into coding standards that agents follow while they write code there, each with its reason and the review comments behind it, and prunes the rules that don't change what agents write. |
 
 Invoke it as `/standards [command] [scope]`:
 
 - `command` is one of `mine`, `write`, `review`, `prune` or `doctor`. With no argument, the skill shows a menu and waits.
 - `scope` is a path or glob, an area from the generated standards, or a § number such as `§2`. A scope with no command runs `review` on it.
+
+Use it in this order:
+
+1. `mine` the review history into ranked conventions.
+2. `write` the standards skill into the repo.
+3. `prune` the rules agents already follow without being told.
+4. Write code. Agents load the generated standards while they edit the files the rules cover.
+5. Optionally, `review` a diff: it adds a standards pass on top of an ordinary review and never replaces it.
+
+Run `doctor` now and then to catch drift.
 
 ## Install
 
