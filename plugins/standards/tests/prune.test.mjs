@@ -203,6 +203,8 @@ test('step, grading and finish converge on a decision, and a rerun changes nothi
   assert.equal(qs.length, 10);
   for (const q of qs) assert.deepEqual(validate(loadSchema('prune.questions'), q), []);
   assert.ok(qs.every((q) => !/none|one-liner|full|fake/.test(q.id)), 'ids do not reveal the arm or harness');
+  assert.deepEqual(qs.map((q) => q.id), qs.map((q) => q.id).sort(), 'questions are in id order, not grouped by rule or arm');
+  assert.notDeepEqual(qs.map((q) => q.section), qs.map((q) => q.section).sort(), 'the order mixes the rules');
 
   ctx = context(fx);
   await step(ctx);

@@ -909,6 +909,8 @@ function writeQuestionFiles(ctx, runs, vmap) {
       const rule = ruleBy.get(r.section);
       qs.push(buildQuestion(rule, r, readFileSync(join(r.dir, 'diff.patch'), 'utf8'), siblingContext(ctx.repo, baseCommit(ctx, r), rule.text, r.files_changed ?? []), ctx.probes.get(r.section)));
     }
+    // Ids are hashes, so sorting by id mixes arms and harnesses: a grader reading in batches cannot see an arm's runs together.
+    qs.sort((x, y) => x.id.localeCompare(y.id));
     const text = qs.map((q) => JSON.stringify(q)).join('\n') + (qs.length ? '\n' : '');
     writeAtomic(graderFile(out, g, 'questions'), text);
     const answeredIds = new Set(readJsonl(graderFile(out, g, 'answers')).map((a) => a.question_id));
