@@ -60,7 +60,7 @@ Gemini CLI, Cursor, Copilot and other harnesses aren't verified here. Copy or li
 
 ```sh
 node scripts/lint.mjs                              # lint the repo's skills and docs
-node --test 'scripts/*.test.mjs'                   # tests for the lint and install.sh
+node --test 'scripts/*.test.mjs'                   # tests for the lint, install.sh and test-harnesses.mjs
 node --test 'plugins/standards/tests/*.test.mjs'   # tests for the standards scripts
 node scripts/test-harnesses.mjs                    # real runs in each installed harness
 ```

@@ -94,7 +94,7 @@ Fill `description` with the file kinds and edit kinds the globs cover, at most 1
 
 ## Step 7. Check the output
 
-When the source repo of this skill is at hand, run its lint on the generated folder: `node scripts/lint.mjs <generated-folder>`. Otherwise check by hand:
+Check by hand, because an installed skill carries no lint. When this skill's source repo is checked out, its lint runs the same checks: `node scripts/lint.mjs <generated-folder>`.
 
 - Frontmatter uses only `name`, `description`, `license`, `compatibility`, `metadata` and `allowed-tools`.
 - `name` matches the folder, and the body of `SKILL.md` stays under about 5000 tokens, at 4 characters per token.

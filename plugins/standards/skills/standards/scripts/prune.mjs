@@ -42,7 +42,7 @@ const USAGE = [
   '  --calibration <file> human labels, one {question_id, complies} per line, that finish scores the first grader against',
   '  --dry-run           print what step would run, and run nothing',
   '',
-  'The harnesses found on this machine: codex, opencode, claude. Run with --help for this text.',
+  'Known harnesses: codex, opencode, claude. Run with --help for this text.',
   'Set CLAUDE_CODE_OAUTH_TOKEN (from claude setup-token) and claude takes its login from the environment, with no copy on disk.',
 ].join('\n');
 

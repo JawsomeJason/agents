@@ -6,7 +6,7 @@ These rules apply to every agent and person who edits this repo, in any harness.
 
 - `plugins/<name>/skills/<skill>/` holds each skill: `SKILL.md`, plus optional `references/`, `scripts/` and `assets/`.
 - `plugins/<name>/.claude-plugin/plugin.json` and the root `.claude-plugin/marketplace.json` are thin install wrappers. They live outside `skills/`, and skills never depend on them.
-- `scripts/` holds repo tooling: the lint, its rules file and its fixtures.
+- `scripts/` holds repo tooling: the lint with its rules file and fixtures, `install.sh`, and `test-harnesses.mjs`, each with its tests.
 
 ## Skills follow the Agent Skills spec only
 
@@ -30,7 +30,7 @@ Skills must keep working as harnesses, models, vendors and runtimes change aroun
 - **Links.** The only external URL a skill may carry is the spec. Examples live in `references/`, and every relative link stays inside its own skill folder.
 - **Time.** Prose carries no time-relative words and no absolute dates. Words like `currently`, `latest` and `recently` go stale. Dates belong in data files.
 - **Reasons.** Every rule states why it exists. A rule with its reason still generalizes after the tools change.
-- **Identity.** No person, company, domain or private path appears anywhere. Skills work for any user at any company.
+- **Identity.** No person, company, domain or private path appears anywhere, except the authorship fields in the install manifests and `LICENSE`, which must name the author. Skills work for any user at any company.
 
 ## Lint
 

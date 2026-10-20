@@ -10,6 +10,7 @@ Run from the target repo's root, on standards that `write` produced. `<skill-dir
 | `trial` | Runs one probe once in the `none` arm and keeps it apart from the counted runs (step 1). |
 | `step` | Runs every batch the sampling still needs, then writes the grading questions (steps 2 and 3). |
 | `status` | Prints each rule's tallies and what it waits on. |
+| `questions` | Writes the grading questions for the runs on disk, and runs nothing. |
 | `finish` | Applies the decision rules and writes `prune.json` (steps 4 and 5). |
 
 Run `step`, grade, and run `step` again until `status` shows every rule decided, then `finish`. A rule moves one batch per `step`, because the next batch depends on how the last one graded.
