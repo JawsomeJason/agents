@@ -70,10 +70,15 @@ function maskCode(text, maskInline) {
   });
 }
 
-function scanDenylists(file, text, scope, report, skip = []) {
+const isQuote = (line) => /^\s*>/.test(line);
+
+// quoteExempt lists rules that skip blockquoted lines, where generated standards quote reviewers verbatim.
+function scanDenylists(file, text, scope, report, { skip = [], quoteExempt = [] } = {}) {
   for (const list of denylists) {
     if (!list.scopes.includes(scope) || skip.includes(list.rule)) continue;
+    const skipQuotes = quoteExempt.includes(list.rule);
     maskCode(text, list.skipInlineCode).forEach((line, i) => {
+      if (skipQuotes && isQuote(line)) return;
       for (const re of list.regexes) {
         re.lastIndex = 0;
         for (const m of line.matchAll(re)) {
@@ -96,8 +101,10 @@ function scanUrls(file, text, report) {
 
 function scanLinks(file, text, skillDir, report) {
   maskCode(text, true).forEach((line, i) => {
-    for (const m of line.matchAll(/\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/g)) {
-      const target = m[1];
+    for (const m of line.matchAll(/\]\(\s*(?:<([^>]*)>|([^)]*?))(?:\s+"[^"]*")?\s*\)/g)) {
+      const target = m[1] ?? m[2];
+      // A template's {{ }} placeholder is filled in later, so it is the one target not checked.
+      if (/^\{\{.*\}\}$/.test(target)) continue;
       if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) continue;
       const path = decodeURIComponent(target.split('#')[0].split('?')[0]);
       const abs = resolve(dirname(file), path);
@@ -170,10 +177,10 @@ function lintSkill(skillDir, report) {
 
   // Standards generated for one repo describe that repo, so they may name the services it runs on.
   const generated = /^\s+generator:\s*standards\s*$/m.test(text.slice(0, text.indexOf('\n---', 3)));
-  const skip = generated ? RULES.generatedStandardsExempt : [];
+  const exempt = generated ? { skip: RULES.generatedStandardsExempt, quoteExempt: RULES.generatedQuoteExempt } : {};
   for (const file of listFiles(skillDir, (f) => f.endsWith('.md'))) {
     const body = readFileSync(file, 'utf8');
-    scanDenylists(file, body, 'skill', report, skip);
+    scanDenylists(file, body, 'skill', report, exempt);
     scanUrls(file, body, report);
     scanLinks(file, body, skillDir, report);
   }

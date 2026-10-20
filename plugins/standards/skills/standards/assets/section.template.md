@@ -16,11 +16,14 @@ Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file is the l
 
 ## Evidence
 
-{{ At least 3 review comments from clusters.json, one per line, in this form. }}
+{{ At least 3 review comments, one list item each, in this form. The excerpt sits in a blockquote under its item, so a reviewer's own words stay verbatim even when they use a time word. }}
 
-- {{ change id }} `{{ path }}`: "{{ excerpt, under 200 characters }}"
-- {{ change id }} `{{ path }}`: "{{ excerpt }}"
-- {{ change id }} review body: "{{ excerpt from a review's summary text, which has no path }}"
+- {{ change id }} `{{ path }}`:
+  > {{ excerpt, under 200 characters }}
+- {{ change id }} `{{ path }}`:
+  > {{ excerpt }}
+- {{ change id }} review body:
+  > {{ excerpt from a review's summary text, which has no path }}
 
 ## Failure model
 

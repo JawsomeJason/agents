@@ -10,6 +10,7 @@
   },
   "extensionKeys": ["argument-hint"],
   "generatedStandardsExempt": ["vendor-name"],
+  "generatedQuoteExempt": ["time-word"],
   "urlAllowlist": ["agentskills.io"],
   "docAllow": ["JawsomeJason/jawsome-agents"],
   "denylists": [

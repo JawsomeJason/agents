@@ -34,7 +34,7 @@ Skills must keep working as harnesses, models, vendors and runtimes change aroun
 
 ## Lint
 
-`scripts/lint.mjs` enforces every rule above that a machine can check. The denylists live in `scripts/lint-rules.json`, so they change without code edits. Standards that the `standards` skill generates for one repo (frontmatter `metadata` holds `generator: standards`) skip the rules in `generatedStandardsExempt`, because they describe that repo and may name the services it runs on.
+`scripts/lint.mjs` enforces every rule above that a machine can check. The denylists live in `scripts/lint-rules.json`, so they change without code edits. Standards that the `standards` skill generates for one repo (frontmatter `metadata` holds `generator: standards`) skip the rules in `generatedStandardsExempt`, because they describe that repo and may name the services it runs on. Their blockquoted lines also skip the rules in `generatedQuoteExempt`, because those quote reviewers word for word. A link target is checked even when it holds a space; only a `{{ }}` template placeholder is skipped.
 
 ```sh
 node scripts/lint.mjs                 # this repo

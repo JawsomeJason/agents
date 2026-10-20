@@ -99,7 +99,7 @@ When the source repo of this skill is at hand, run its lint on the generated fol
 - `name` matches the folder, and the body of `SKILL.md` stays under about 5000 tokens, at 4 characters per token.
 - Every link resolves inside the skill folder, and every § file has an index line.
 - Every § has a why, at least 3 evidence lines, globs that match tracked files and none broader than about 25% of their kind, and a confirmed-when bar.
-- No § carries a URL, a date, or a time-relative word, because each one goes stale while the rule still holds.
+- No § carries a URL, a date, or a time-relative word outside a quoted excerpt, because each one goes stale while the rule still holds. A reviewer's quoted words stay verbatim, so the lint skips blockquotes for time words.
 
 Done when every check passes.
 

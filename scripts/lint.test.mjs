@@ -15,12 +15,14 @@ const expected = {
   'description-missing': 'description-missing',
   'doc-scope': 'time-word',
   'fence-length': 'fence-length',
+  'generated-time-word': 'time-word',
   'extension-key-unlisted': 'frontmatter-key',
   'frontmatter-key': 'frontmatter-key',
   'frontmatter-missing': 'frontmatter-missing',
   'harness-tool': 'harness-tool',
   'link-broken': 'link-broken',
   'link-escape': 'link-escape',
+  'link-space': 'link-broken',
   'marketplace-plugins': 'marketplace-plugins',
   'model-name': 'model-name',
   'name-dir': 'name-dir',
@@ -37,7 +39,7 @@ const expected = {
   'vendor-name': 'vendor-name',
 };
 
-const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-vendor-allowed'];
+const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder'];
 
 test('every fixture directory has an expectation', () => {
   const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => !passing.includes(d));
@@ -50,6 +52,19 @@ test('clean fixture passes', () => {
 
 test('generated standards may name the services their repo runs on', () => {
   assert.deepEqual(lint(fixture('generated-vendor-allowed')), []);
+});
+
+test('generated standards may quote a reviewer\'s time word in a blockquote', () => {
+  assert.deepEqual(lint(fixture('generated-quote-allowed')), []);
+});
+
+test('a time word outside a quote in generated standards still fails, on its own line', () => {
+  assert.deepEqual(lint(fixture('generated-time-word')).map((e) => [e.line, e.rule]), [[10, 'time-word']]);
+});
+
+test('a link target with a space is checked, and only a {{ }} placeholder is skipped', () => {
+  assert.deepEqual(lint(fixture('link-placeholder')), []);
+  assert.deepEqual(lint(fixture('link-space')).map((e) => e.message), ['"references/no such file.md" does not resolve']);
 });
 
 test('an allowlisted extension key passes', () => {
