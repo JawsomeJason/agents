@@ -44,9 +44,10 @@ const expected = {
   'doc-history': 'history-word',
   'workflow-pin': 'workflow-pin',
   'manifest-sync': 'manifest-sync',
+  'generated-section': 'generated-section',
 };
 
-const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term', 'fence-nested'];
+const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term', 'fence-nested', 'generated-section-complete'];
 
 test('every fixture directory has an expectation', () => {
   const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => !passing.includes(d));
@@ -129,4 +130,8 @@ test('every shipped file is scanned for identity, except LICENSE and the manifes
 
 test('workflows pin every action by SHA and the runner image', () => {
   assert.deepEqual(lint(fixture('workflow-pin')).map((e) => e.line), [4, 6]);
+});
+
+test('a generated § file that follows the template passes the section check', () => {
+  assert.deepEqual(lint(fixture('generated-section-complete')), []);
 });

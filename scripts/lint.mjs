@@ -228,6 +228,7 @@ function lintSkill(skillDir, report) {
     scanDenylists(file, body, 'code', report, exempt);
     scanUrls(file, body, report);
   }
+  if (generated) lintGeneratedSections(skillDir, report);
 
   const scriptsDir = join(skillDir, 'scripts');
   if (existsSync(scriptsDir)) {
@@ -239,6 +240,33 @@ function lintSkill(skillDir, report) {
         report(join(scriptsDir, script), 1, 'script-schema', `no output schema at references/schemas/${stem}.*`);
       }
     }
+  }
+}
+
+const section = (text, heading) => {
+  const m = new RegExp(`^## ${heading}\\s*$([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm').exec(text);
+  return m ? m[1] : null;
+};
+
+/**
+ * Each generated § file keeps the parts a reader needs to trust its rule: an Applies to line, a why, at least 3
+ * evidence items each naming the heuristic it fires, and a confirmed-when bar. doctor reports the same gaps as
+ * section-incomplete; this is the half a machine can check.
+ */
+function lintGeneratedSections(skillDir, report) {
+  const refs = join(skillDir, 'references');
+  if (!existsSync(refs)) return;
+  for (const name of readdirSync(refs).filter((n) => /^s\d+(-\d+)*-.+\.md$/.test(n))) {
+    const file = join(refs, name);
+    const text = readFileSync(file, 'utf8');
+    const gaps = [];
+    if (!/^- Applies to: \S/m.test(text)) gaps.push('an Applies to line');
+    if (!section(text, 'Why')?.trim()) gaps.push('a non-empty ## Why');
+    const items = (section(text, 'Evidence') ?? '').split(/^- /m).slice(1);
+    if (items.length < 3) gaps.push(`3 evidence items (has ${items.length})`);
+    else if (items.some((it) => !/^\s*fires: \S/m.test(it))) gaps.push('a fires: line under every evidence item');
+    if (!section(text, 'Confirmed when')?.trim()) gaps.push('a non-empty ## Confirmed when');
+    if (gaps.length) report(file, 1, 'generated-section', `needs ${gaps.join(', ')}`);
   }
 }
 
