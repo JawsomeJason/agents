@@ -1,6 +1,6 @@
 # §{{ id }} {{ title }}
 
-Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file is the lens a reviewer applies for that rule.
+Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file holds the rule's why, evidence and examples, for an agent writing code it governs. A standards review pass also matches its heuristics against a diff.
 
 - Applies to: {{ globs, each in backticks, each matching at least one tracked file and at most about 25% of the tracked files of its kind; or `by trigger` }}
 - Triggers: {{ edit kinds, such as adding an endpoint or changing a schema; with `by trigger`, a pattern to match against added lines, such as a call or an import }}
