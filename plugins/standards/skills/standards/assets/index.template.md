@@ -1,13 +1,13 @@
 ---
 name: {{ repo-slug }}-standards
-description: Coding standards for {{ repo }}, mined from its code review history. Use when writing or changing {{ file kinds the globs cover, such as API handlers or database migrations }}, or when reviewing a diff in this repo. {{ One trigger per area, naming the edit, such as adding an endpoint or writing a migration. }}
+description: Coding standards for {{ repo }}, mined from its code review history. Use when editing or adding {{ file kinds the globs cover, such as API handlers or database migrations }} in this repo. {{ One trigger per area, naming the edit, such as adding an endpoint or writing a migration. }}
 metadata:
   generator: standards
 ---
 
 # {{ repo }} standards
 
-Each line below is a rule that reviewers in this repo enforced on at least 3 changes, more than one reviewer among them. Follow it when you write code. When you review a diff, open the linked § for its why, its evidence, its examples and the heuristics to match against the diff.
+Each line below is a rule that reviewers in this repo enforced on at least 3 changes, more than one reviewer among them. Follow it while you write code. A standards review pass, which adds to an ordinary review, opens the linked § for its why, its evidence, its examples and the heuristics to match against the diff.
 
 Each line names its rule's default severity in parentheses, so a reviewer knows before opening the § that a nit still gets reported.
 

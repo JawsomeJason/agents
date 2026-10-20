@@ -90,7 +90,7 @@ Copy [the section template](../assets/section.template.md) to `references/s<area
 
 Copy [the index template](../assets/index.template.md) to the skill folder as `SKILL.md`. List every § as its one-liner, then its default severity in parentheses, such as `(nit)`, then a link to its file, and keep the `metadata` block so `review` and `doctor` can find this skill. The severity is the § file's Default severity line. It sits in the index because a reviewer reads the index first, and a rule it knows is a nit is one it reports instead of holding back.
 
-Fill `description` with the file kinds and edit kinds the globs cover, at most 1024 characters. The description decides when an agent loads the standards, so each area's edit kind belongs in it.
+Fill `description` with the file kinds and edit kinds the globs cover, at most 1024 characters, phrased as writing triggers such as editing or adding those files. The description decides when an agent loads the standards, and the standards exist to be followed while code is written, so each area's edit kind belongs in it. Leave reviewing out of it: a review pass finds the standards through `metadata`, and a review trigger only pulls the index into context when no code is being written.
 
 ## Step 7. Check the output
 
@@ -115,7 +115,7 @@ Run it when the user wants to know whether shape B beats shape A on their repo.
 
 1. Hold out the 20 newest merged changes that each have at least 2 inline comments from reviewers (not bots, not the change's author). Most merged changes get no inline comments, so the last 20 alone leave little to score. Run `mine` only on changes merged before the oldest held-out change was opened, so no mined comment describes code a held-out review will see. Write the standards against the repo as it stood then, for the same reason.
 2. Write shape A and shape B from the same `clusters.json`, into two separate scratch folders.
-3. For each held-out change, spawn three fresh reviewer subagents: one with no standards, and one per shape. Give each the change's diff as it stood at the commit the first reviewer comment points at, so fixes made in answer to review are not in it, plus only its own shape's standards. Have the shape reviewers run `review`. The no-standards reviewer is the baseline, because a shape that wins against the other shape but not against no standards adds nothing.
+3. For each held-out change, spawn three fresh reviewer subagents: one with no standards, and one per shape. Give each the change's diff as it stood at the commit the first reviewer comment points at, so fixes made in answer to review are not in it, plus only its own shape's standards. Have the shape reviewers do an ordinary review and then run `review` on top of it, so a shape is scored as the extra pass it is. The no-standards reviewer is the baseline, because a shape that wins against the other shape but not against no standards adds nothing.
 4. Score each shape on three numbers. Recall is the share of the human convention comments on the held-out changes that the reviewer also raised. False positives are findings no human raised and the confirmed-when bar does not support, per change. Tokens loaded are the characters of every standards file the reviewer read, divided by 4, per review.
 5. Pick the winner. Higher recall wins. Recall within one caught comment across the 20 changes is a tie, settled by fewer false positives, then by fewer tokens. A tie on all three goes to A, because one description costs less context than many.
 
