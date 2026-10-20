@@ -10,7 +10,7 @@ Accepts an area slug or §. See [scope](scope.md) for the forms and how to resol
 
 ## Step 1. Read the inputs
 
-1. Read `.standards/clusters.json`. When it is missing, stop and offer `mine`, because a § without mined evidence is a guess.
+1. Read `.standards/clusters.json`. When it is missing, stop and offer `mine`, because a § without mined evidence is a guess. Its examples are cut short, so for each cluster also read the full comments and their whole threads in `.standards/reviews.jsonl`: the reviewer's reason often sits in a reply, and a later reply can narrow or reverse what the first comment asked for.
 2. Look for standards this skill wrote before: a `SKILL.md` whose frontmatter `metadata` holds `generator: standards`. When one exists, update it in place, keep its § numbers, and read its `prune.json`.
 3. Skip every cluster whose rule `prune.json` marks `delete`, unless a harness's default model has changed since that run. The run showed agents follow that rule unprompted, and writing it back would undo the measurement.
 
@@ -53,7 +53,7 @@ Place the folder where the repo keeps its skills. When the repo has no skills fo
 
 Copy [the section template](../assets/section.template.md) to `references/s<area>-<n>-<slug>.md` and replace every `{{ }}` placeholder.
 
-- **Why.** Take it from the reviewers' own reasons in the evidence. When no comment gives a reason and you cannot state one the evidence supports, do not write the §. List it as "no why" in the report so the user can supply one. A rule without its reason fails as soon as the code around it changes shape.
+- **Why.** Take it from the reviewers' own reasons in the evidence, read to the end of each thread. When a thread settles on something other than what its first comment asked, write the rule the thread settled on. When no comment gives a reason and you cannot state one the evidence supports, do not write the §. List it as "no why" in the report so the user can supply one. A rule without its reason fails as soon as the code around it changes shape.
 - **Evidence.** Cite at least 3 comments from the cluster, each with its change id, its path and a short excerpt.
 - **Applies to.** Derive globs from the cluster's paths, using their shared directories and extensions. Run `git ls-files` and keep only globs that match at least one tracked file. A glob that matches nothing never triggers its lens.
 - **Failure model.** Name each way the rule gets broken, with a default severity from the cluster's comments.
