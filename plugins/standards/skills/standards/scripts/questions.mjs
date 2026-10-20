@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -150,7 +150,22 @@ export function check(questions, answers) {
   return { problems, answered };
 }
 
+/**
+ * Gives a `.standards` folder a `.gitignore` holding `*` the first time a script writes under it, because work files
+ * quote code and people the repo never meant to publish. The repo's own .gitignore is left alone.
+ */
+export function ignoreWorkDir(file) {
+  let dir = dirname(resolve(file));
+  while (basename(dir) !== '.standards') {
+    if (dirname(dir) === dir) return;
+    dir = dirname(dir);
+  }
+  mkdirSync(dir, { recursive: true });
+  if (!existsSync(join(dir, '.gitignore'))) writeFileSync(join(dir, '.gitignore'), '*\n');
+}
+
 function writeAtomic(file, text) {
+  ignoreWorkDir(file);
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp-${process.pid}`;
   writeFileSync(tmp, text);

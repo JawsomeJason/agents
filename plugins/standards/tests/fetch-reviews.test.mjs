@@ -238,3 +238,12 @@ test('with no forge, review-fix commits each count as a change and their authors
   assert.deepEqual(result.clusters.map((c) => [c.label, c.changes.length, c.reviewers.length]), [['wrap-errors', 5, 3]]);
   assert.equal(result.reviewer_basis, 'commit-author');
 });
+
+test('a fetch into .standards leaves git status clean, because the folder ignores itself', () => {
+  const cwd = gitRepo(HISTORY);
+  fetchReviews({ cwd, out: join(cwd, '.standards/reviews.jsonl'), run: fakeRunner() });
+  assert.equal(readFileSync(join(cwd, '.standards/.gitignore'), 'utf8'), '*\n');
+  assert.equal(git(cwd, ['status', '--porcelain']), '');
+  fetchReviews({ cwd, out: join(cwd, '.standards/reviews.jsonl'), run: fakeRunner() });
+  assert.equal(readFileSync(join(cwd, '.standards/.gitignore'), 'utf8'), '*\n', 'a rerun changes nothing');
+});

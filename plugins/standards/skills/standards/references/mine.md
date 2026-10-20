@@ -2,7 +2,7 @@
 
 Pulls a repo's review history, labels each comment by the convention it enforces, and ranks the conventions by frequency times severity. The output, `.standards/clusters.json`, is what `write` turns into standards.
 
-Run every step from the target repo's root. Every work file goes in `.standards/` there. Keep that folder out of version control, because review comments quote code and people the repo never meant to publish.
+Run every step from the target repo's root. Every work file goes in `.standards/` there. Keep that folder out of version control, because review comments quote code and people the repo never meant to publish. Each script that writes there adds `.standards/.gitignore` holding `*` when the folder has none; by hand, write that file first.
 
 `<skill-dir>` below is the folder that holds this skill's `SKILL.md`. Each step names a script that does it faster. When a script is missing or exits non-zero, do the step by hand and write the same file, which the step's schema defines. Every step overwrites its own output, so rerunning a step converges on the same file.
 

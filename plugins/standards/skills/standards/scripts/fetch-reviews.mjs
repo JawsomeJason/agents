@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { ignoreWorkDir } from './questions.mjs';
 
 const USAGE = 'usage: fetch-reviews.mjs --out <file> [--limit <changes>] [--refresh]';
 const PER_PAGE = 100;
@@ -266,6 +267,7 @@ export function fetchReviews({ cwd, out, limit = 0, refresh = false, run = syste
 }
 
 function writeAtomic(file, text) {
+  ignoreWorkDir(file);
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp-${process.pid}`;
   writeFileSync(tmp, text);

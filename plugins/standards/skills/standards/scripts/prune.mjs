@@ -9,6 +9,7 @@ import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { ignoreWorkDir } from './questions.mjs';
 
 const USAGE = [
   'usage: prune.mjs <plan|trial|step|status|questions|finish> --standards <dir> --repo <dir> --out <dir> --probes <file> [options]',
@@ -74,6 +75,7 @@ const bySection = (a, b) => {
 };
 
 function writeAtomic(file, text) {
+  ignoreWorkDir(file);
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
   writeFileSync(tmp, text);

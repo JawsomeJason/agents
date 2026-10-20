@@ -3,7 +3,7 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { LOW_CONFIDENCE, UsageError, check, isReviewerComment, readJsonl, readLabels } from './questions.mjs';
+import { LOW_CONFIDENCE, UsageError, check, ignoreWorkDir, isReviewerComment, readJsonl, readLabels } from './questions.mjs';
 
 const USAGE =
   'usage: cluster.mjs --reviews <reviews.jsonl> --questions <questions.jsonl> --answers <answers.jsonl> --labels <labels.json> --out <clusters.json>';
@@ -144,6 +144,7 @@ function main(argv) {
     answers: readJsonl(values.answers, 'answers'),
     labels: readLabels(values.labels),
   });
+  ignoreWorkDir(values.out);
   mkdirSync(dirname(values.out), { recursive: true });
   const tmp = `${values.out}.tmp-${process.pid}`;
   writeFileSync(tmp, `${JSON.stringify(result, null, 2)}\n`);
