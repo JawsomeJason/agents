@@ -108,7 +108,9 @@ export function readJsonl(file) {
 // ---------------------------------------------------------------------------------------------
 // Standards and probes
 
-const INDEX_LINE = /^- (§\d+(?:\.\d+)*) (.+?) \[§\d+(?:\.\d+)*\]\(([^)]+)\)( Read first\.)?\s*$/;
+// The severity tag is for a reviewer reading the index. Telling a writing agent the rule is a nit is a treatment
+// of its own, so it stays out of the rule text the arms and the grader see.
+const INDEX_LINE = /^- (§\d+(?:\.\d+)*) (.+?)(?: \((nit|minor|major|blocker)\))? \[§\d+(?:\.\d+)*\]\(([^)]+)\)( Read first\.)?\s*$/;
 
 /** Every rule in the standards index: its § id, one-liner, § file path and file text. */
 export function loadStandards(dir) {
@@ -118,9 +120,9 @@ export function loadStandards(dir) {
   for (const line of readFileSync(skillFile, 'utf8').split('\n')) {
     const m = INDEX_LINE.exec(line);
     if (!m) continue;
-    const file = resolve(dir, m[3]);
-    if (!existsSync(file)) throw new UsageError(`${skillFile} links ${m[3]} for ${m[1]}, which does not exist`);
-    rules.push({ section: m[1], rule: m[2].trim(), indexLine: line.replace(/^- /, '').trim(), readFirst: Boolean(m[4]), file, text: readFileSync(file, 'utf8').trim() });
+    const file = resolve(dir, m[4]);
+    if (!existsSync(file)) throw new UsageError(`${skillFile} links ${m[4]} for ${m[1]}, which does not exist`);
+    rules.push({ section: m[1], rule: m[2].trim(), severity: m[3] ?? null, indexLine: line.replace(/^- /, '').trim(), readFirst: Boolean(m[5]), file, text: readFileSync(file, 'utf8').trim() });
   }
   if (!rules.length) throw new UsageError(`no index lines of the form "- §N.M rule [§N.M](path)" in ${skillFile}`);
   return rules.sort((a, b) => bySection(a.section, b.section));

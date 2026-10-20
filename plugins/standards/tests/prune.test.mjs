@@ -186,6 +186,15 @@ test('loadStandards reads the index and rejects a link to a missing file', () =>
   assert.throws(() => loadStandards(fx.standards), /does not exist/);
 });
 
+test('a severity tag on an index line stays out of the rule text the arms and the grader see', () => {
+  const fx = fixture();
+  writeFileSync(join(fx.standards, 'SKILL.md'), INDEX.replace('Keep files short. [§1.2]', 'Keep files short. (nit) [§1.2]'));
+  const rule = loadStandards(fx.standards).find((r) => r.section === '§1.2');
+  assert.deepEqual([rule.rule, rule.severity], ['Keep files short.', 'nit']);
+  assert.equal(buildPrompt('one-liner', rule, 'P'), 'Project rule: Keep files short.\n\nP');
+  assert.equal(buildQuestion(rule, { section: '§1.2', harness: 'h', arm: 'none', run: 1 }, 'diff').prompt, 'Does this output follow this rule: Keep files short.');
+});
+
 test('a probe set must cover every rule', () => {
   const fx = fixture();
   writeFileSync(fx.probes, JSON.stringify([{ section: '§1.1', probe: 'Add a greeting.' }]));
