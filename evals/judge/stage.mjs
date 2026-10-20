@@ -68,7 +68,7 @@ function prompt({ dir, repoName, commit, arm }) {
   }
   lines.push(
     '',
-    'Review it the way a careful maintainer of this repository would. Report each problem you would post as an inline review comment: bugs, design and API problems, naming, style and convention issues, missing tests or docs. Report only what you would actually post. Skip praise and summaries of what the code does.',
+    'Review it the way a careful maintainer of this repository would. Report each problem you would raise as an inline review comment, whatever its size: bugs, design and API problems, naming, style and convention issues, missing tests or docs. Skip praise and summaries of what the code does.',
     '',
     `Write your findings to ${dir}/findings.json as JSON in this shape:`,
     '',
