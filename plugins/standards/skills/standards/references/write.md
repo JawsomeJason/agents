@@ -23,14 +23,19 @@ Sort each cluster into one status:
 | Status | Meaning | Action |
 | --- | --- | --- |
 | `enforced` | A linter, type check, formatter or test already catches it. | No §. The tool is its home. |
-| `documented` | A rules file states it, but no tool checks it. | No §, unless the user asks to move it. That file is its home. |
+| `documented` | A rules file that agents load when they write code states it with specifics, but no tool checks it. | No §, unless the user asks to move it. That file is its home. |
+| `thin` | The only existing statement is a generic line, or it lives only in a reviewer-facing doc. | Write a §. The § becomes the home. |
 | `missing` | Nothing states or checks it. | Write a §. |
+
+A line is generic when it is one sentence with no specifics and no examples, such as "keep functions small" or "handle errors properly": it names the topic but not the rule the reviewers enforced, so an agent that reads it still writes the code the reviewers flagged. A reviewer-facing doc is one only a reviewer reads, such as a review checklist or a reviewing skill. An agent writing code never loads it, so it cannot be the convention's home for that agent.
+
+For each `thin` cluster, name the thin home in the report: its file, its line, and why it is thin. Offer to replace that line with a one-line pointer to the new §, so the convention keeps one home instead of a generic copy that drifts from it. Make that edit only when the user agrees, because the file belongs to the repo, not to the standards.
 
 Then mark each rule in the existing files `dead` when it names files, APIs or tools the repo no longer has.
 
-Report a table of file, convention and status before writing anything. A convention with two homes drifts, and an agent follows whichever copy it read first.
+Report a table of file, convention and status before writing anything, with each `thin` home named. A convention with two homes drifts, and an agent follows whichever copy it read first.
 
-A `missing` convention that a tool could check is a check candidate. Write its § anyway, so the convention is covered until the check exists, and list it in the report. A check fails every time, while a § works only when someone reads it.
+A `missing` or `thin` convention that a tool could check is a check candidate. Write its § anyway, so the convention is covered until the check exists, and list it in the report. A check fails every time, while a § works only when someone reads it.
 
 ## Step 3. Pick the output shape
 
@@ -44,7 +49,7 @@ Place the folder where the repo keeps its skills. When the repo has no skills fo
 
 ## Step 4. Number the rules
 
-1. Group the `missing` clusters into 3 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling.
+1. Group the `missing` and `thin` clusters into 3 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling.
 2. Order the areas by their best cluster rank, and number them §1, §2 and on. Within an area, number rules by rank: §1.1, §1.2.
 3. When updating earlier standards, keep every existing number and append new rules at the end of their area. Review comments cite § numbers, and renumbering breaks those citations.
 4. Write each rule as one imperative sentence a person could follow without the § file.
@@ -81,7 +86,7 @@ Done when every check passes.
 
 ## Step 8. Report
 
-List the files written, the § count per area, the homes table from step 2, the check candidates, and any cluster left out for having no why. Offer `prune` next, because a rule agents already follow costs tokens on every load and changes nothing.
+List the files written, the § count per area, the homes table from step 2 with each thin home and its pointer offer, the check candidates, and any cluster left out for having no why. Offer `prune` next, because a rule agents already follow costs tokens on every load and changes nothing.
 
 ## Shape experiment
 
