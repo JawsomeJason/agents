@@ -40,6 +40,8 @@ Skills must keep working as harnesses, models, vendors and runtimes change aroun
 node scripts/lint.mjs                 # this repo
 node scripts/lint.mjs path/to/folder  # any folder of skills, such as generated standards
 node --test 'scripts/*.test.mjs'     # the lint's own tests
+node --test 'plugins/standards/tests/*.test.mjs'  # the standards scripts
+node --test 'evals/judge/*.test.mjs'           # the judge harness
 ```
 
 Errors print as `file:line rule message`, and the lint exits non-zero when it finds any. Every check has a violating fixture in `scripts/lint-fixtures/`, and `scripts/lint.test.mjs` proves each fixture fails its rule and the clean fixture passes. Add a fixture and a test with every check you add.
