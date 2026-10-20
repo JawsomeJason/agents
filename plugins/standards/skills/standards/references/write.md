@@ -49,6 +49,12 @@ Place the folder where the repo keeps its skills. When the repo has no skills fo
 
 ## Step 4. Number the rules
 
+A cluster is one label, not always one rule. Before numbering, read each kept cluster's threads and decide which rules it holds:
+
+- **Split** a cluster when its comments ask for conventions that one imperative sentence cannot state, such as three separate requests that share a topic. Write one rule per convention.
+- **Pool** evidence across clusters when comments under another label ask for the same rule. A labeler picks one label per comment, so a rule's evidence can sit in two clusters.
+- Each rule cites only the comments that ask for it, and each rule on its own needs comments from at least 3 distinct changes and 2 distinct reviewers, the same floor `mine` applies. A rule that falls under the floor after a split is left out and listed in the report as "too little evidence", because the floor is what keeps one reviewer's taste out of the standards.
+
 1. Group the `missing` and `thin` clusters into 3 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling.
 2. Order the areas by their best cluster rank, and number them §1, §2 and on. Within an area, number rules by rank: §1.1, §1.2.
 3. When updating earlier standards, keep every existing number and append new rules at the end of their area. Review comments cite § numbers, and renumbering breaks those citations.
@@ -59,7 +65,7 @@ Place the folder where the repo keeps its skills. When the repo has no skills fo
 Copy [the section template](../assets/section.template.md) to `references/s<area>-<n>-<slug>.md` and replace every `{{ }}` placeholder.
 
 - **Why.** Take it from the reviewers' own reasons in the evidence, read to the end of each thread. When a thread settles on something other than what its first comment asked, write the rule the thread settled on. When no comment gives a reason and you cannot state one the evidence supports, do not write the §. List it as "no why" in the report so the user can supply one. A rule without its reason fails as soon as the code around it changes shape.
-- **Evidence.** Cite at least 3 comments from the cluster, spanning at least 3 distinct changes and 2 distinct reviewers, each with its change id, its path and a short excerpt.
+- **Evidence.** Cite at least 3 of this rule's own comments, from its cluster or pooled from others, spanning at least 3 distinct changes and 2 distinct reviewers. Give each its change id, its path and a short excerpt. Never cite a comment that asks for a different rule from the same cluster.
 - **Applies to.** Derive globs from the cluster's paths, using their shared directories and extensions. Run `git ls-files` and keep only globs that match at least one tracked file. A glob that matches nothing never triggers its lens.
 - **Failure model.** Name each way the rule gets broken, with a default severity from the cluster's comments.
 - **Examples.** Write both examples in the repo's language, against its real types and helpers, and check that each one compiles or parses. A broken example teaches the wrong code to every agent that copies it.
@@ -86,7 +92,7 @@ Done when every check passes.
 
 ## Step 8. Report
 
-List the files written, the § count per area, the homes table from step 2 with each thin home and its pointer offer, the check candidates, and any cluster left out for having no why. Offer `prune` next, because a rule agents already follow costs tokens on every load and changes nothing.
+List the files written, the § count per area, the homes table from step 2 with each thin home and its pointer offer, the check candidates, any cluster left out for having no why, each cluster split into several rules or pooled into another, and any rule left out for too little evidence. Offer `prune` next, because a rule agents already follow costs tokens on every load and changes nothing.
 
 ## Shape experiment
 
