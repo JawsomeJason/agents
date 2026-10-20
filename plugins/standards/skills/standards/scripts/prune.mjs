@@ -644,11 +644,16 @@ const tail = (res) => {
   return t ? `: ${t}` : '';
 };
 
-/** Stages everything the agent left in the worktree and returns its diff against the base commit. */
-export function captureDiff(wt, head) {
+/**
+ * Stages everything the agent left in the worktree and returns its diff against the base commit, leaving out
+ * the standards folder: the runner deletes it before the agent starts, so that deletion is not the agent's work,
+ * and an agent that only writes there changed nothing the probe asked for.
+ */
+export function captureDiff(wt, head, standardsRel = null) {
   git(wt, ['add', '-A']);
-  const diff = git(wt, ['diff', '--cached', '--no-color', head]);
-  const files = git(wt, ['diff', '--cached', '--name-only', head]).split('\n').filter(Boolean);
+  const scope = ['--', '.', ...(standardsRel ? [`:(exclude)${standardsRel}`] : [])];
+  const diff = git(wt, ['diff', '--cached', '--no-color', head, ...scope]);
+  const files = git(wt, ['diff', '--cached', '--name-only', head, ...scope]).split('\n').filter(Boolean);
   return { diff, files };
 }
 
@@ -671,7 +676,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
     // Some harnesses take their working directory from $PWD, which a spawn does not update.
     const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: harnessEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
     if (res.code !== 0 && THROTTLED.test(`${res.stdout}\n${res.stderr}`)) return { failed: `throttled${tail(res)}`, throttled: true, log: `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX) };
-    const { diff, files } = captureDiff(wt, ctx.head);
+    const { diff, files } = captureDiff(wt, ctx.head, ctx.standardsRel);
     const got = harness.adapter.collect({ tmp, stdout: res.stdout, stderr: res.stderr });
     const finished = new Date();
     const log = `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX);

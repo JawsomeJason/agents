@@ -348,6 +348,23 @@ test('worktrees hold only the checkout: no remote, one commit, and the standards
   assert.ok(diff.includes(`+pwd=${seen.wt}\n`), 'the agent starts in its worktree, not the directory the runner started in');
 });
 
+test('with the standards committed in the repo, an idle run and a run that only writes the standards folder both fail as no changes', async () => {
+  const fx = fixture();
+  const nested = join(fx.repo, 'x-standards');
+  mkdirSync(join(nested, 'references'), { recursive: true });
+  writeFileSync(join(nested, 'SKILL.md'), INDEX);
+  writeFileSync(join(nested, 'references/s1-1-names.md'), '# §1.1\n');
+  writeFileSync(join(nested, 'references/s1-2-short.md'), '# §1.2\n');
+  git(fx.repo, ['add', '-A']);
+  git(fx.repo, ['commit', '-q', '-m', 'add standards']);
+  for (const script of ['true', 'mkdir -p x-standards && echo note > x-standards/NOTES.md']) {
+    const adapter = { ...fakeAdapter(), prepare: () => ({ argv: ['-c', script], env: {} }) };
+    const ctx = createContext({ standards: nested, repo: fx.repo, out: join(fx.dir, `out-${script.length}`), probes: fx.probes, harnesses: ['fake'], graders: ['a'], log: () => {} }, { fake: adapter });
+    const r = await trial(ctx, '§1.1', 'fake');
+    assert.match(r.failed ?? '', /^no changes/, script);
+  }
+});
+
 test('a run lost mid-step leaves a gap, and the next step numbers after the highest run instead of overwriting one', async () => {
   const fx = fixture();
   await step(context(fx));
