@@ -187,7 +187,12 @@ export async function main(args, harnesses = HARNESSES) {
   }
   const keep = args.includes('--keep');
   const hIdx = args.indexOf('--harness');
-  const only = hIdx >= 0 ? args[hIdx + 1].split(',') : null;
+  const only = hIdx >= 0 ? (args[hIdx + 1] ?? '').split(',').filter(Boolean) : null;
+  const unknown = only?.filter((n) => !harnesses[n]) ?? [];
+  if (only && (!only.length || unknown.length)) {
+    console.error(`${only.length ? `unknown harness: ${unknown.join(', ')}` : '--harness needs a value'}; known: ${Object.keys(harnesses).join(', ')}\n${USAGE}`);
+    return 2;
+  }
   const menu = menuLines();
   // Every temp home and login copy lives in one owner-only folder, removed on exit, on an uncaught error, SIGINT and SIGTERM.
   const scratch = privateDir(tmpdir(), 'harness-');
@@ -203,8 +208,11 @@ export async function main(args, harnesses = HARNESSES) {
       }
     }
     const fails = results.filter((r) => r.status === 'fail').length;
-    console.log(`harnesses: ${results.filter((r) => r.status === 'pass').length} pass, ${fails} fail, ${results.filter((r) => r.status === 'skip').length} skip`);
-    return fails ? 1 : 0;
+    const passes = results.filter((r) => r.status === 'pass').length;
+    console.log(`harnesses: ${passes} pass, ${fails} fail, ${results.filter((r) => r.status === 'skip').length} skip`);
+    // A release check that ran nothing proved nothing, so it does not pass.
+    if (!passes && !fails) console.log('no harness ran; nothing was tested');
+    return fails || !passes ? 1 : 0;
   } finally {
     scratch.dispose();
   }

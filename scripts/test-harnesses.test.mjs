@@ -99,3 +99,20 @@ test('the claude harness gets only the allowlisted environment and its own token
     for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
 });
+
+test('an unknown or missing --harness value is a usage error, and a run that tests nothing fails', async () => {
+  const { main } = await import(SCRIPT);
+  const fake = { command: 'no-such-binary-xyz', auth: () => null, setup: () => { throw new Error('not reached'); } };
+  const quiet = (fn) => async () => {
+    const [log, err] = [console.log, console.error];
+    console.log = console.error = () => {};
+    try {
+      return await fn();
+    } finally {
+      [console.log, console.error] = [log, err];
+    }
+  };
+  assert.equal(await quiet(() => main(['--harness', 'claud'], { fake }))(), 2);
+  assert.equal(await quiet(() => main(['--harness'], { fake }))(), 2);
+  assert.equal(await quiet(() => main(['--harness', 'fake'], { fake }))(), 1, 'every harness skipped');
+});
