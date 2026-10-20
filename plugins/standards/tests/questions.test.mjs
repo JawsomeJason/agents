@@ -51,6 +51,8 @@ test('ask writes three valid questions per reviewer comment and skips bots and t
     ['forge:1#convention', 'forge:1#label', 'forge:1#severity', 'git-log:abc1234#convention', 'git-log:abc1234#label', 'git-log:abc1234#severity'],
   );
   assert.deepEqual(questions[1].options, ['dto-at-boundary', 'test-behavior', 'none']);
+  assert.equal(questions[1].option_descriptions['dto-at-boundary'], LABELS[0].description);
+  assert.match(questions[1].option_descriptions.none, /none of the other conventions/);
   assert.deepEqual(questions[2].levels, ['nit', 'minor', 'major', 'blocker']);
   assert.equal(questions[0].state, 'Comment:\nComment forge:1\n\nPath: src/a.js\n\nDiff hunk:\n@@ -1 +1 @@\n-a\n+b');
   assert.match(questions[3].state, /^Comment:\nAddress review\n\nCommit diff:\n/);

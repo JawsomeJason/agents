@@ -41,6 +41,11 @@
       "uniqueItems": true,
       "description": "For choice questions: every label id from .standards/labels.json, plus none."
     },
+    "option_descriptions": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 },
+      "description": "For choice questions: each option mapped to what it means. Label options carry their description from labels.json, so an answerer can tell the labels apart without reading that file."
+    },
     "levels": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
@@ -52,15 +57,15 @@
   "allOf": [
     {
       "if": { "properties": { "kind": { "const": "choice" } } },
-      "then": { "required": ["options"], "not": { "required": ["levels"] } }
+      "then": { "required": ["options", "option_descriptions"], "not": { "required": ["levels"] } }
     },
     {
       "if": { "properties": { "kind": { "const": "score" } } },
-      "then": { "required": ["levels"], "not": { "required": ["options"] } }
+      "then": { "required": ["levels"], "allOf": [{ "not": { "required": ["options"] } }, { "not": { "required": ["option_descriptions"] } }] }
     },
     {
       "if": { "properties": { "kind": { "const": "yesno" } } },
-      "then": { "allOf": [{ "not": { "required": ["options"] } }, { "not": { "required": ["levels"] } }] }
+      "then": { "allOf": [{ "not": { "required": ["options"] } }, { "not": { "required": ["option_descriptions"] } }, { "not": { "required": ["levels"] } }] }
     },
     {
       "if": { "properties": { "topic": { "const": "convention" } } },

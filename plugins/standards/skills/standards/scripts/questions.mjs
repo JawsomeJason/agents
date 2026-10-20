@@ -12,6 +12,7 @@ export const LOW_CONFIDENCE = 0.6;
 export const SEVERITY_LEVELS = ['nit', 'minor', 'major', 'blocker'];
 const ANSWERERS = ['judgment-model', 'agent', 'human'];
 const LABEL_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const NONE_DESCRIPTION = 'The comment enforces none of the other conventions, or no convention at all.';
 
 const PROMPTS = {
   convention:
@@ -80,8 +81,10 @@ function stateOf(review) {
   return parts.join('\n\n');
 }
 
+// An id alone is too terse to choose between, so each option carries its label's description.
 export function ask(reviews, labels) {
   const options = [...labels.map((l) => l.id), 'none'];
+  const option_descriptions = Object.fromEntries([...labels.map((l) => [l.id, l.description]), ['none', NONE_DESCRIPTION]]);
   const seen = new Set();
   const questions = [];
   for (const review of reviews) {
@@ -90,7 +93,7 @@ export function ask(reviews, labels) {
     if (!isReviewerComment(review)) continue;
     const state = stateOf(review);
     const q = (topic, kind, extra) => ({ id: `${review.id}#${topic}`, review_id: review.id, topic, kind, prompt: PROMPTS[topic], state, ...extra });
-    questions.push(q('convention', 'yesno'), q('label', 'choice', { options }), q('severity', 'score', { levels: SEVERITY_LEVELS }));
+    questions.push(q('convention', 'yesno'), q('label', 'choice', { options, option_descriptions }), q('severity', 'score', { levels: SEVERITY_LEVELS }));
   }
   return questions;
 }

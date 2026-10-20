@@ -50,7 +50,7 @@ By hand, write three questions for every reviewer comment: human, and not by the
 | Topic | Kind | Prompt |
 | --- | --- | --- |
 | `convention` | `yesno` | Does this review comment ask for a change that applies to other code in this repo, not only to this line? |
-| `label` | `choice` | Which convention does this review comment enforce? Options are every label id plus `none`. |
+| `label` | `choice` | Which convention does this review comment enforce? Options are every label id plus `none`, each with its description in `option_descriptions`. |
 | `severity` | `score` | How much harm would ignoring this comment cause? Levels are `nit`, `minor`, `major`, `blocker`. |
 
 Done when every reviewer comment has exactly three questions.
