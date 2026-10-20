@@ -845,6 +845,14 @@ function ruleState(ctx, rule, runs, verdictMap) {
 // ---------------------------------------------------------------------------------------------
 // Commands
 
+/** A whole-number option at least min. NaN would start no worker, or kill every run at once, and report success. */
+function count(name, value, fallback, min) {
+  if (value === undefined) return fallback;
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < min) throw new UsageError(`--${name} must be a whole number of at least ${min}, got ${value}`);
+  return n;
+}
+
 export function createContext(opts, adapters = ADAPTERS) {
   const required = ['standards', 'repo', 'out', 'probes'];
   for (const n of required) if (!opts[n]) throw new UsageError(`--${n} is required\n${USAGE}`);
@@ -880,10 +888,10 @@ export function createContext(opts, adapters = ADAPTERS) {
     standardsRel: rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel : null,
     standardsPath: rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel : basename(standardsDir),
     graders: opts.graders ?? [],
-    concurrency: Number(opts.concurrency ?? 3),
-    backoffMs: Number(opts['backoff-sec'] ?? 30) * 1000,
+    concurrency: count('concurrency', opts.concurrency, 3, 1),
+    backoffMs: count('backoff-sec', opts['backoff-sec'], 30, 0) * 1000,
     halted: new Set(),
-    timeoutMs: Number(opts['timeout-min'] ?? 25) * 60_000,
+    timeoutMs: count('timeout-min', opts['timeout-min'], 25, 1) * 60_000,
     tmpRoot: opts['tmp-root'] ?? tmpdir(),
     env,
     writable: (opts.writable ?? []).map((d) => resolve(d)),

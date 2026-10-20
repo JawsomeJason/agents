@@ -195,6 +195,14 @@ test('a severity tag on an index line stays out of the rule text the arms and th
   assert.equal(buildQuestion(rule, { section: '§1.2', harness: 'h', arm: 'none', run: 1 }, 'diff').prompt, 'Does this output follow this rule: Keep files short.');
 });
 
+test('a numeric option that is not a whole number is a usage error, not a silent run of nothing', () => {
+  const fx = fixture();
+  for (const [name, value] of [['concurrency', 'three'], ['concurrency', '0'], ['timeout-min', 'x'], ['backoff-sec', '-1']]) {
+    assert.throws(() => context(fx, 'rule', { [name]: value }), new RegExp(`--${name} must be a whole number`), `${name}=${value}`);
+  }
+  assert.equal(context(fx, 'rule', { 'backoff-sec': '0' }).backoffMs, 0);
+});
+
 test('a probe set must cover every rule', () => {
   const fx = fixture();
   writeFileSync(fx.probes, JSON.stringify([{ section: '§1.1', probe: 'Add a greeting.' }]));
