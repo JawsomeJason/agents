@@ -873,3 +873,9 @@ test('an agent environment keeps locale, proxy and CA settings and drops everyth
     for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
 });
+
+test('editing a rule\'s index one-liner asks a new grading question', () => {
+  const run = { section: '§1.1', harness: 'fake', arm: 'none', run: 1, diff_sha256: 'd' };
+  const rule = { section: '§1.1', text: 'Body.', rule: 'Name values.' };
+  assert.notEqual(prune.questionId(run, rule, 'P'), prune.questionId(run, { ...rule, rule: 'Never name values.' }, 'P'));
+});

@@ -262,7 +262,7 @@ const sha256 = (text) => createHash('sha256').update(text).digest('hex');
  * the probe. A redone run, an edited § or a rewritten probe then gets a new question, and its old verdict no longer
  * matches anything.
  */
-export const questionId = (r, rule, probe) => `${sha256([runKey(r), r.diff_sha256, sha256(rule.text), sha256(probe)].join('\n')).slice(0, 12)}#complies`;
+export const questionId = (r, rule, probe) => `${sha256([runKey(r), r.diff_sha256, sha256(rule.text), sha256(rule.rule), sha256(probe)].join('\n')).slice(0, 12)}#complies`;
 
 const CRITERIA = {
   true: 'Every place the diff adds or changes code that this rule governs follows the rule, or the diff touches nothing the rule governs.',
