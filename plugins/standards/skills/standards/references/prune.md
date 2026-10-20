@@ -74,7 +74,7 @@ Apply each decision to the standards:
 | Decision | Edit |
 | --- | --- |
 | `delete` | Remove the index line and the § file. Leave the § number unused, because review comments may cite it. |
-| `one-liner` | No edit. The index line is enough. |
+| `one-liner` | Remove a "Read first." that `write` added. The index line is enough. |
 | `full` or `weak` | End the index line with "Read first.", so an agent opens the § before it edits a matching file. |
 
 Show the planned edits as a diff, then apply them.

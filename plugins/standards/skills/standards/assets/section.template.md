@@ -20,7 +20,7 @@ Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file is the l
 
 - {{ change id }} `{{ path }}`: "{{ excerpt, under 200 characters }}"
 - {{ change id }} `{{ path }}`: "{{ excerpt }}"
-- {{ change id }} `{{ path }}`: "{{ excerpt }}"
+- {{ change id }} review body: "{{ excerpt from a review's summary text, which has no path }}"
 
 ## Failure model
 

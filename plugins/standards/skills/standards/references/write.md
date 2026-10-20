@@ -35,6 +35,8 @@ Then mark each rule in the existing files `dead` when it names files, APIs or to
 
 Report a table of file, convention and status before writing anything, with each `thin` home named. A convention with two homes drifts, and an agent follows whichever copy it read first.
 
+When a user invoked `write` interactively, wait for their go-ahead on the table, because a status they dispute changes which § files get written. Otherwise, such as under a script, a subagent or an unattended run, report the table and continue to step 3 without waiting. The step 8 report repeats it, so nothing is decided out of sight.
+
 A `missing` or `thin` convention that a tool could check is a check candidate. Write its § anyway, so the convention is covered until the check exists, and list it in the report. A check fails every time, while a § works only when someone reads it.
 
 ## Step 3. Pick the output shape
@@ -42,6 +44,14 @@ A `missing` or `thin` convention that a tool could check is a check candidate. W
 Shape A is the default. Write one skill, named `<repo-slug>-standards`, with the index as its `SKILL.md` and one `references/s<area>-<n>-<slug>.md` file per §. An agent loads one short index and opens only the § files a change touches.
 
 Shape B is the option. Write one skill per area, named `<repo-slug>-standards-<area>`, each with its own description, index and § files. Each area then triggers on its own, at the cost of one description per area held in context.
+
+Write each shape B description so it loads its area and no other:
+
+- Say what the area covers, by the file kinds its globs match and the code it governs, such as "HTTP handlers under `api/`".
+- Name the edit kinds from its § Triggers lines as "Use when" triggers, such as adding an endpoint or changing a response type.
+- Keep rule text out. The description decides when to load the skill, and the index carries the rules.
+- Make each area's triggers distinct from every other area's, so one edit does not load two areas for one rule.
+- Stay within 1024 characters.
 
 Use B only when the user asks for it, or when a shape experiment on this repo picked it. See "Shape experiment" below.
 
@@ -58,14 +68,16 @@ A cluster is one label, not always one rule. Before numbering, read each kept cl
 1. Group the rules that survive into 1 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling. Size the areas to the rules: a handful of rules may need only one or two areas, and an area of one rule is fine when no other rule shares its part of the code. Splitting few rules across many areas adds index headings, and in shape B whole descriptions, without helping an agent find a rule.
 2. Order the areas by their best cluster rank, and number them §1, §2 and on. Within an area, number rules by rank: §1.1, §1.2.
 3. When updating earlier standards, keep every existing number and append new rules at the end of their area. Review comments cite § numbers, and renumbering breaks those citations.
-4. Write each rule as one imperative sentence a person could follow without the § file.
+4. Break ties in rank, such as two rules split from one cluster, by more distinct changes in the rule's own evidence, then more comments, then higher mean severity, then the slug in alphabetical order. A fixed order keeps the numbers the same when `write` reruns.
+5. Write each rule as one imperative sentence a person could follow without the § file.
+6. End the index line with "Read first." when the one-liner cannot carry what following the rule needs: a named helper or type, an order of steps, or an exception the rule allows. Mark it too when the rule's default severity is `major` or `blocker`, because a miss there costs more than opening one file. This is a guess until `prune` measures it, and `prune` sets or clears the mark from its results.
 
 ## Step 5. Write each §
 
 Copy [the section template](../assets/section.template.md) to `references/s<area>-<n>-<slug>.md` and replace every `{{ }}` placeholder.
 
 - **Why.** Take it from the reviewers' own reasons in the evidence, read to the end of each thread. When a thread settles on something other than what its first comment asked, write the rule the thread settled on. When no comment gives a reason and you cannot state one the evidence supports, do not write the §. List it as "no why" in the report so the user can supply one. A rule without its reason fails as soon as the code around it changes shape.
-- **Evidence.** Cite at least 3 of this rule's own comments, from its cluster or pooled from others, spanning at least 3 distinct changes and 2 distinct reviewers. Give each its change id, its path and a short excerpt. Never cite a comment that asks for a different rule from the same cluster.
+- **Evidence.** Cite at least 3 of this rule's own comments, from its cluster or pooled from others, spanning at least 3 distinct changes and 2 distinct reviewers. Give each its change id, its path and a short excerpt. A review body or a commit has no path, so write `review body` or `commit` in the path's place, in the form the template shows. Never cite a comment that asks for a different rule from the same cluster.
 - **Applies to.** Derive globs from the rule's evidence paths, using their shared directories and extensions. Run `git ls-files` and keep only globs that match at least one tracked file. A glob that matches nothing never triggers its lens.
 - **Glob breadth.** No glob may match more than about 25% of the repo's tracked files of its kind: files with the glob's extension, or all tracked files when it names none. Count both with `git ls-files` and a short script. A glob that broad triggers its lens on almost every change, which loads the § and invites findings on code the rule never meant. Narrow the glob to the directories the evidence sits in. When the rule truly applies everywhere its file kind appears, write `Applies to: by trigger` instead, and make the Triggers line a pattern a reviewer can match against added lines, such as a call, an import or a type, so the trigger lives in the heuristic rather than the path.
 - **Failure model.** Name each way the rule gets broken, with a default severity from the cluster's comments.
