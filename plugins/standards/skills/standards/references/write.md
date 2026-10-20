@@ -10,7 +10,7 @@ Accepts an area slug or §. See [scope](scope.md) for the forms and how to resol
 
 ## Step 1. Read the inputs
 
-1. Read `.standards/clusters.json`. When it is missing, stop and offer `mine`, because a § without mined evidence is a guess. Its examples are cut short, so for each cluster also read the full comments and their whole threads in `.standards/reviews.jsonl`: the reviewer's reason often sits in a reply, and a later reply can narrow or reverse what the first comment asked for.
+1. Read `.standards/clusters.json`. When it is missing, stop and offer `mine`, because a § without mined evidence is a guess. When its `reanswer` list is not empty, stop and finish `mine` step 5, because those answers can still change which clusters exist. Its examples are cut short, so for each cluster also read the full comments and their whole threads in `.standards/reviews.jsonl`: the reviewer's reason often sits in a reply, and a later reply can narrow or reverse what the first comment asked for.
 2. Look for standards this skill wrote before: a `SKILL.md` whose frontmatter `metadata` holds `generator: standards`. When one exists, update it in place, keep its § numbers, and read its `prune.json`.
 3. Skip every cluster whose rule `prune.json` marks `delete`, unless a harness's default model has changed since that run. The run showed agents follow that rule unprompted, and writing it back would undo the measurement.
 

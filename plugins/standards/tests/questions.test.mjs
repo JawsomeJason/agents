@@ -81,10 +81,10 @@ test('check passes a matching answers file', () => {
   writeJsonl(join(dir, 'answers.jsonl'), answers);
   const r = runNode('questions.mjs', checkArgs, dir);
   assert.equal(r.status, 0, r.stdout);
-  assert.equal(r.stdout, '4 questions, 4 answers, 0 to fix or re-answer\n');
+  assert.equal(r.stdout, '4 questions, 4 answers, 0 to fix\n');
 });
 
-test('check rejects a mismatched answers file and lists every problem', () => {
+test('check rejects a mismatched answers file, lists every problem, and leaves low confidence to cluster', () => {
   const dir = setup();
   runNode('questions.mjs', askArgs, dir);
   const answers = matching();
@@ -100,13 +100,12 @@ test('check rejects a mismatched answers file and lists every problem', () => {
     r.stdout,
     [
       'invalid forge:1#label "naming" is not an option',
-      'low-confidence forge:1#severity confidence 0.4',
       'unknown forge:99#label answers no question in the questions file',
       'duplicate forge:1#severity has more than one answer',
       'unknown forge:1#convention answers no question in the questions file',
       'duplicate git-log:abc1234#label has more than one answer',
       'missing git-log:abc1234#severity has no answer',
-      '4 questions, 7 answers, 7 to fix or re-answer',
+      '4 questions, 7 answers, 6 to fix',
       '',
     ].join('\n'),
   );

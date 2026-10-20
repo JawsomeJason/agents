@@ -80,6 +80,7 @@ test('ranks by count times severity, drops clusters under 3 changes or 2 reviewe
     ],
   );
   assert.deepEqual(out.min_count, { changes: 3, reviewers: 2 });
+  assert.deepEqual(out.reanswer, []);
   assert.deepEqual(out.dropped, [
     { label: 'one-change', count: 3, changes: 1, reviewers: 2 },
     { label: 'one-reviewer', count: 3, changes: 3, reviewers: 1 },
@@ -97,6 +98,25 @@ test('ranks by count times severity, drops clusters under 3 changes or 2 reviewe
   const bytes = readFileSync(join(dir, 'out/clusters.json'), 'utf8');
   assert.equal(runNode('cluster.mjs', args, dir).status, 0);
   assert.equal(readFileSync(join(dir, 'out/clusters.json'), 'utf8'), bytes);
+});
+
+test('lists only the low-confidence model answers that can change a kept cluster', () => {
+  const dir = setup();
+  const low = { 'forge:1#severity': ['judgment-model', 0.4], 'forge:9#severity': ['judgment-model', 0.4], 'forge:12#label': ['judgment-model', 0.55], 'forge:2#label': ['agent', 0.3] };
+  const answers = readJsonl(join(dir, 'answers.jsonl')).map((a) => {
+    const [by, confidence] = low[a.question_id] ?? [];
+    return by ? { ...a, answered_by: by, confidence, model: by === 'agent' ? undefined : 'test-model' } : a;
+  });
+  writeJsonl(join(dir, 'answers.jsonl'), answers);
+  const r = runNode('cluster.mjs', args, dir);
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(readFileSync(join(dir, 'out/clusters.json'), 'utf8'));
+  assert.deepEqual(validate(loadSchema('cluster.clusters'), out), []);
+  assert.deepEqual(out.reanswer, [
+    { question_id: 'forge:1#severity', confidence: 0.4, reason: 'severity changes the score of many-minor' },
+    { question_id: 'forge:12#label', confidence: 0.55, reason: 'label can move this comment between clusters' },
+  ]);
+  assert.match(r.stdout, /2 low-confidence answers can change a cluster; re-answer them, then rerun/);
 });
 
 test('refuses answers that do not match the questions', () => {

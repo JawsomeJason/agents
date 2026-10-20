@@ -116,7 +116,8 @@ function invalidReason(question, a) {
   return null;
 }
 
-// Every problem except low-confidence means the two files do not line up.
+// Every problem means the two files do not line up. Which low-confidence answers to re-answer
+// depends on the clusters, so cluster.mjs lists those.
 export function check(questions, answers) {
   const byId = new Map(questions.map((q) => [q.id, q]));
   const answered = new Map();
@@ -134,9 +135,6 @@ export function check(questions, answers) {
     answered.set(a.question_id, a);
     const reason = invalidReason(question, a);
     if (reason) problems.push({ kind: 'invalid', id: a.question_id, detail: reason });
-    else if (a.confidence < LOW_CONFIDENCE) {
-      problems.push({ kind: 'low-confidence', id: a.question_id, detail: `confidence ${a.confidence}` });
-    }
   }
   for (const q of questions) {
     if (!answered.has(q.id)) problems.push({ kind: 'missing', id: q.id, detail: 'has no answer' });
@@ -180,7 +178,7 @@ function main(argv) {
     const answers = readJsonl(values.answers, 'answers');
     const { problems } = check(questions, answers);
     for (const p of problems) console.log(`${p.kind} ${p.id} ${p.detail}`);
-    console.log(`${questions.length} questions, ${answers.length} answers, ${problems.length} to fix or re-answer`);
+    console.log(`${questions.length} questions, ${answers.length} answers, ${problems.length} to fix`);
     return problems.length ? 1 : 0;
   }
   throw new UsageError(USAGE);

@@ -3,7 +3,7 @@ import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { UsageError, check, isReviewerComment, readJsonl, readLabels } from './questions.mjs';
+import { LOW_CONFIDENCE, UsageError, check, isReviewerComment, readJsonl, readLabels } from './questions.mjs';
 
 const USAGE =
   'usage: cluster.mjs --reviews <reviews.jsonl> --questions <questions.jsonl> --answers <answers.jsonl> --labels <labels.json> --out <clusters.json>';
@@ -23,12 +23,29 @@ function excerpt(body) {
 
 const distinct = (values) => [...new Set(values.filter((v) => v !== null && v !== undefined))];
 
+// A low-confidence judgment-model answer is worth re-answering only when a different answer
+// could change a kept cluster. Any label answer can move its comment into, out of or between
+// clusters. A severity answer moves a score only for a comment kept in a cluster that survives.
+// An agent's or human's answer is already the re-answer, so it is never listed again.
+function reanswerList(human, answer, kept) {
+  const out = [];
+  for (const review of human) {
+    const label = answer(review, 'label');
+    const severity = answer(review, 'severity');
+    const low = (a) => a.answered_by === 'judgment-model' && a.confidence < LOW_CONFIDENCE;
+    if (low(label)) out.push({ question_id: label.question_id, confidence: label.confidence, reason: 'label can move this comment between clusters' });
+    if (low(severity) && kept.has(label.answer)) {
+      out.push({ question_id: severity.question_id, confidence: severity.confidence, reason: `severity changes the score of ${label.answer}` });
+    }
+  }
+  return out;
+}
+
 export function cluster({ reviews, questions, answers, labels }) {
   const { problems, answered } = check(questions, answers);
-  const blocking = problems.filter((p) => p.kind !== 'low-confidence');
-  if (blocking.length) {
-    const sample = blocking.slice(0, 5).map((p) => `${p.kind} ${p.id}`).join(', ');
-    throw new UsageError(`answers do not match questions (${blocking.length} found, such as ${sample}); run questions.mjs check`);
+  if (problems.length) {
+    const sample = problems.slice(0, 5).map((p) => `${p.kind} ${p.id}`).join(', ');
+    throw new UsageError(`answers do not match questions (${problems.length} found, such as ${sample}); run questions.mjs check`);
   }
   const reviewIds = new Set(reviews.map((r) => r.id));
   const orphan = questions.find((q) => !reviewIds.has(q.review_id));
@@ -82,6 +99,7 @@ export function cluster({ reviews, questions, answers, labels }) {
       })),
     });
   }
+  const reanswer = reanswerList(human, answer, new Set(clusters.map((c) => c.label)));
   clusters.sort((a, b) => b.score - a.score || b.count - a.count || (a.label < b.label ? -1 : 1));
   dropped.sort((a, b) => b.count - a.count || (a.label < b.label ? -1 : 1));
 
@@ -94,6 +112,7 @@ export function cluster({ reviews, questions, answers, labels }) {
       severity_weights: SEVERITY_WEIGHTS,
       clusters: clusters.map((c, i) => ({ rank: i + 1, ...c })),
       dropped,
+      reanswer,
     },
     tally: { human: human.length, none, kept },
   };
@@ -126,6 +145,8 @@ function main(argv) {
     `${result.clusters.length} clusters kept, ${result.dropped.length} dropped. ` +
       `${tally.human} reviewer comments = ${tally.none} labeled none + ${tally.kept} kept`,
   );
+  for (const r of result.reanswer) console.log(`re-answer ${r.question_id} confidence ${r.confidence}: ${r.reason}`);
+  if (result.reanswer.length) console.log(`${result.reanswer.length} low-confidence answers can change a cluster; re-answer them, then rerun`);
   console.log(`wrote ${values.out}`);
 }
 

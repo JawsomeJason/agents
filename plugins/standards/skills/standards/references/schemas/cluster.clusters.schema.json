@@ -4,7 +4,7 @@
   "description": "The ranked conventions in .standards/clusters.json. Written by scripts/cluster.mjs, or by hand. The input to write.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["inputs", "min_count", "severity_weights", "clusters", "dropped"],
+  "required": ["inputs", "min_count", "severity_weights", "clusters", "dropped", "reanswer"],
   "properties": {
     "inputs": {
       "type": "object",
@@ -98,6 +98,20 @@
           "count": { "type": "integer", "minimum": 0, "description": "Comments with this label." },
           "changes": { "type": "integer", "minimum": 0, "description": "Distinct changes those comments came from." },
           "reviewers": { "type": "integer", "minimum": 0, "description": "Distinct reviewers those comments came from." }
+        }
+      }
+    },
+    "reanswer": {
+      "type": "array",
+      "description": "Judgment-model answers under 0.6 confidence that could change a kept cluster: every such label answer, and severity answers for comments in a kept cluster. Re-answer each with answered_by agent, then rerun. write needs this empty.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["question_id", "confidence", "reason"],
+        "properties": {
+          "question_id": { "type": "string", "minLength": 1 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "reason": { "type": "string", "minLength": 1, "description": "Which cluster a different answer could change." }
         }
       }
     }

@@ -70,13 +70,11 @@ A judgment model is a fast model that answers typed questions (pick one of a set
 
 Then check the answers.
 
-Script: `node <skill-dir>/scripts/questions.mjs check --questions .standards/questions.jsonl --answers .standards/answers.jsonl`. It lists questions with no answer and answers with `confidence` under 0.6. It also lists answers to unknown questions, second answers to one question, and answers that are not one of the question's options or levels, and it exits non-zero while anything is listed.
+Script: `node <skill-dir>/scripts/questions.mjs check --questions .standards/questions.jsonl --answers .standards/answers.jsonl`. It lists questions with no answer, answers to unknown questions, second answers to one question, and answers that are not one of the question's options or levels, and it exits non-zero while anything is listed.
 
-By hand, join the two files on question id with a short script and list the same two sets. Counting by eye misses gaps in a file this size.
+By hand, join the two files on question id with a short script and list the same sets. Counting by eye misses gaps in a file this size.
 
-Re-answer every listed question yourself, reading the comment's whole thread, and set `answered_by` to `agent`. Low-confidence answers are where a fast answerer is most often wrong, and they are few enough to read.
-
-Done when every question has exactly one answer and the check lists nothing.
+Done when every question has exactly one answer and the check lists nothing. Low-confidence answers are handled after step 5, because only the clusters show which of them matter.
 
 ## Step 5. Cluster and rank
 
@@ -93,7 +91,14 @@ By hand, write a short script that does each of these, because the counts decide
 5. Set `score` to count times severity. Sort by score, highest first, and number `rank` from 1.
 6. For each cluster, list every review id, change, reviewer and path, and pick up to 5 examples that state the convention most plainly.
 
-Done when `clusters.json` validates and its counts reconcile. Every reviewer comment lands in exactly one group: labeled `none`, or kept. The two counts sum to the reviewer comment count.
+Then re-answer what can change a cluster. Low-confidence answers are where a fast answerer is most often wrong, but most of them cannot move any cluster, and re-reading those costs time for nothing. List every judgment-model answer with `confidence` under 0.6 that a different answer could change:
+
+- every label answer, because a different label moves the comment into, out of or between clusters;
+- severity answers only for comments kept in a cluster that survives item 4 above, because elsewhere severity changes no score.
+
+The script writes this list to `reanswer` in `clusters.json` and prints it. Re-answer each listed question yourself, reading the comment's whole thread, and set `answered_by` to `agent`. An agent's answer is final: it is never listed again, so the loop ends. Then rerun this step, because a changed label can make a cluster survive and bring its severity answers into the list.
+
+Done when `clusters.json` validates, its counts reconcile, and `reanswer` is empty. Every reviewer comment lands in exactly one group: labeled `none`, or kept. The two counts sum to the reviewer comment count.
 
 ## Step 6. Report
 
