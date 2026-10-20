@@ -34,7 +34,7 @@ List tracked files with `git ls-files`. A § whose Applies to line says `by trig
 ## Step 4. Check the prune record
 
 - **`prune-missing`.** The standards folder has no `prune.json`. Nobody has measured whether agents follow these rules unprompted. Fix: run `prune`.
-- **`prune-stale`.** For each harness in `prune.json`, find the ID of the model it defaults to now, from the harness's own output or by asking the user. Flag every harness whose model ID differs from the recorded one. A rule measured on one model says nothing about the next. Fix: rerun `prune`.
+- **`prune-stale`.** For each harness in `prune.json`, find the ID of the model it defaults to now, from the harness's own output or by asking the user. Flag every harness whose model ID differs from the recorded one. A harness recorded with `model_pinned` was measured on a chosen model, so report it as pinned and not as matching the default. A rule measured on one model says nothing about the next. Fix: rerun `prune`.
 
 ## Step 5. Check each § is complete
 

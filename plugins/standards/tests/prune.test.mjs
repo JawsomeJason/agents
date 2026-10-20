@@ -7,7 +7,7 @@ import { git, gitRepo, readJsonl, tempDir, writeJsonl } from './helpers.mjs';
 import { loadSchema, validate } from './schema.mjs';
 
 const prune = await import(fileURLToPath(new URL('../skills/standards/scripts/prune.mjs', import.meta.url)));
-const { advance, buildPrompt, checkAnswers, consensus, createContext, finish, liftOf, loadStandards, readRuns, status, step, trial, trimDiff } = prune;
+const { advance, buildPrompt, buildQuestion, siblingContext, siblingPaths, checkAnswers, consensus, createContext, finish, liftOf, loadStandards, readRuns, status, step, trial, trimDiff } = prune;
 
 const H = ['alpha', 'beta'];
 /** A cell from a string such as "5/5": that many graded runs, that many complied. */
@@ -352,4 +352,56 @@ test('a harness the caller did not name is recorded as skipped, with the caller\
   const byName = Object.fromEntries(ctx.harnesses.map((h) => [h.name, [h.status, h.reason]]));
   assert.deepEqual(byName, { other: ['skipped', 'not requested'], third: ['skipped', 'waiting'], fake: ['ran', null] });
   assert.deepEqual(ctx.activeNames, ['fake']);
+});
+
+test('siblingPaths puts rule-named files first, then same-directory, sibling-directory and same-named files, never tests or changed files', () => {
+  const tree = [
+    'pkg/cmd/ssh-key/list/list.go', 'pkg/cmd/ssh-key/list/list_test.go', 'pkg/cmd/ssh-key/list/http.go',
+    'pkg/cmd/ssh-key/add/add.go', 'pkg/cmd/pr/list/list.go', 'pkg/cmd/issue/list/list.go', 'pkg/iostreams/color.go', 'README.md',
+  ];
+  const got = siblingPaths(tree, 'Heuristic: `pkg/iostreams/color.go` marks it; `missing/file.go` is not in the repo.', ['pkg/cmd/ssh-key/list/list.go', 'pkg/cmd/ssh-key/list/list_test.go']);
+  assert.deepEqual(got, ['pkg/iostreams/color.go', 'pkg/cmd/ssh-key/list/http.go', 'pkg/cmd/ssh-key/add/add.go', 'pkg/cmd/issue/list/list.go', 'pkg/cmd/pr/list/list.go']);
+});
+
+test('a grading question carries the sibling files as they stood before the change', () => {
+  const dir = tempDir();
+  mkdirSync(join(dir, 'cmd/a'), { recursive: true });
+  mkdirSync(join(dir, 'cmd/b'), { recursive: true });
+  writeFileSync(join(dir, 'cmd/a/list.go'), 'package a\n');
+  writeFileSync(join(dir, 'cmd/b/list.go'), 'package b // SIBLING-MARK\n');
+  git(dir, ['init', '-q', '-b', 'main']);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'init']);
+  const head = git(dir, ['rev-parse', 'HEAD']).trim();
+  const siblings = siblingContext(dir, head, 'Match the sibling.', ['cmd/a/list.go']);
+  assert.match(siblings, /--- cmd\/b\/list\.go\npackage b \/\/ SIBLING-MARK/);
+  const rule = { section: '§1.2', rule: 'Match the sibling.', text: 'Match the sibling.' };
+  const run = { section: '§1.2', harness: 'h', arm: 'none', run: 1 };
+  assert.match(buildQuestion(rule, run, 'diff --git a/x b/x\n', siblings).state, /SIBLING-MARK/);
+  assert.doesNotMatch(buildQuestion(rule, run, 'diff --git a/x b/x\n').state, /siblings/);
+});
+
+test('a pinned model reaches the harness and is recorded in the runs and prune.json', async () => {
+  const fx = fixture();
+  const adapter = fakeAdapter('rule');
+  let seen = null;
+  const prepare = adapter.prepare;
+  adapter.prepare = (a) => { seen = a.model; return prepare(a); };
+  const ctx = createContext({
+    standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], model: ['fake=pinned-model-9'], graders: ['a', 'b'],
+    sections: ['§1.1'], concurrency: 2, 'prune-json': join(fx.out, 'prune.json'), log: () => {},
+  }, { fake: adapter });
+  await step(ctx);
+  assert.equal(seen, 'pinned-model-9');
+  assert.ok(readRuns(fx.out).every((r) => r.model_pinned === true));
+  answerAll(fx, 'a');
+  answerAll(fx, 'b');
+  await step(ctx);
+  answerAll(fx, 'a');
+  answerAll(fx, 'b');
+  const { record } = finish(ctx);
+  assert.equal(record.harnesses[0].model_pinned, true);
+  assert.ok(record.runs.every((r) => r.model_pinned === true));
+  assert.deepEqual(validate(loadSchema('prune'), record), []);
+  assert.throws(() => createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, model: ['nope=x'], log: () => {} }, { fake: adapter }), /no known harness/);
 });

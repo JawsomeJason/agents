@@ -34,6 +34,7 @@ const USAGE = [
   '  --timeout-min <n>   minutes before a run is killed (default 25)',
   '  --backoff-sec <n>   first wait after a throttled provider, doubling up to 8 minutes (default 30)',
   '  --env KEY=VALUE     extra environment for every agent run (repeatable)',
+  '  --model name=ID     pin a harness to a model instead of its default (repeatable); the run data records the pin',
   '  --writable <dir>    extra directory an agent may write to (repeatable)',
   '  --prune-json <file> where finish writes prune.json (default: beside the standards SKILL.md)',
   '  --summary <file>    where finish writes the per-rule markdown table',
@@ -266,14 +267,76 @@ export function trimDiff(diff, max = QUESTION_DIFF_MAX) {
   return `${out}\n[${dropped} more file diffs left out for length]\n`;
 }
 
-export function buildQuestion(rule, run, diff) {
+const SIBLING_FILE_MAX = 6_000;
+const SIBLING_TOTAL_MAX = 30_000;
+const SIBLING_COUNT_MAX = 8;
+const TEST_FILE = /(_test\.|\.test\.|\.spec\.|(^|\/)tests?\/)/;
+const treeCache = new Map();
+
+function treeAt(repo, head) {
+  const key = `${repo}@${head}`;
+  if (!treeCache.has(key)) treeCache.set(key, git(repo, ['ls-tree', '-r', '--name-only', head]).split('\n').filter(Boolean));
+  return treeCache.get(key);
+}
+
+const dirOf = (p) => p.slice(0, Math.max(p.lastIndexOf('/'), 0));
+const baseOf = (p) => p.slice(p.lastIndexOf('/') + 1);
+const sharedDepth = (a, b) => {
+  const x = a.split('/');
+  const y = b.split('/');
+  let n = 0;
+  while (n < x.length && n < y.length && x[n] === y[n]) n++;
+  return n;
+};
+
+/**
+ * Paths of the files a grader needs beside the diff, at the commit the runs branched from, most
+ * relevant first: files the rule names, then neighbors of each changed file in its own directory,
+ * then the files of its sibling directories, then same-named files elsewhere, nearest first.
+ * Changed files and test files are left out; the diff already shows the first and the second teach nothing.
+ */
+export function siblingPaths(tree, ruleText, changed) {
+  const inTree = new Set(tree);
+  const changedSet = new Set(changed);
+  const chosen = [];
+  const add = (p) => {
+    if (inTree.has(p) && !changedSet.has(p) && !TEST_FILE.test(p) && !chosen.includes(p)) chosen.push(p);
+  };
+  for (const m of ruleText.matchAll(/`([\w@./-]+\.\w+)`/g)) add(m[1]);
+  const sources = changed.filter((f) => !TEST_FILE.test(f));
+  const nearest = (f, list) => [...list].sort((a, b) => sharedDepth(f, b) - sharedDepth(f, a) || a.localeCompare(b));
+  for (const f of sources) for (const p of tree.filter((t) => dirOf(t) === dirOf(f))) add(p);
+  for (const f of sources) {
+    const parent = dirOf(dirOf(f));
+    for (const p of nearest(f, tree.filter((t) => dirOf(dirOf(t)) === parent && dirOf(t) !== dirOf(f)))) add(p);
+  }
+  for (const f of sources) for (const p of nearest(f, tree.filter((t) => baseOf(t) === baseOf(f) && dirOf(t) !== dirOf(f)))) add(p);
+  return chosen.slice(0, SIBLING_COUNT_MAX);
+}
+
+/** The sibling files' text, each cut to a size, as one block for a grading question. */
+export function siblingContext(repo, head, ruleText, changed) {
+  const paths = siblingPaths(treeAt(repo, head), ruleText, changed);
+  let out = '';
+  for (const p of paths) {
+    let text = git(repo, ['show', `${head}:${p}`]);
+    if (text.length > SIBLING_FILE_MAX) text = `${text.slice(0, SIBLING_FILE_MAX)}\n[file cut at ${SIBLING_FILE_MAX} characters]\n`;
+    const block = `--- ${p}\n${text}\n`;
+    if (out.length + block.length > SIBLING_TOTAL_MAX) break;
+    out += block;
+  }
+  return out;
+}
+
+export function buildQuestion(rule, run, diff, siblings = '') {
+  const context = siblings ? `\n\nFiles the rule points at and the changed files' siblings, as they stood before the change:\n${siblings}` : '';
   return {
     id: questionId(run),
     kind: 'yesno',
     section: rule.section,
     prompt: `Does this output follow this rule: ${rule.rule}`,
     criteria: CRITERIA,
-    state: `Rule section:\n${rule.text}\n\nDiff produced for a change request:\n${trimDiff(diff)}`,
+    state: `Rule section:\n${rule.text}\n\nDiff produced for a change request:\n${trimDiff(diff)}${context}`,
   };
 }
 
@@ -340,13 +403,13 @@ export const ADAPTERS = {
   codex: {
     command: 'codex',
     auth: () => (existsSync(join(HOME, '.codex/auth.json')) ? null : 'not logged in (no auth.json)'),
-    prepare({ tmp, wt, prompt, writable }) {
+    prepare({ tmp, wt, prompt, writable, model }) {
       const codexHome = join(tmp, 'codex');
       mkdirSync(codexHome);
       mkdirSync(join(tmp, 'home'));
       copyFileSync(join(HOME, '.codex/auth.json'), join(codexHome, 'auth.json'));
       const add = writable.flatMap((d) => ['--add-dir', d]);
-      return { argv: ['exec', '--json', '-s', 'workspace-write', '-C', wt, ...add, prompt], env: { HOME: join(tmp, 'home'), CODEX_HOME: codexHome } };
+      return { argv: ['exec', '--json', '-s', 'workspace-write', '-C', wt, ...(model ? ['-m', model] : []), ...add, prompt], env: { HOME: join(tmp, 'home'), CODEX_HOME: codexHome } };
     },
     collect({ tmp, stdout }) {
       const events = jsonLines(stdout);
@@ -362,12 +425,12 @@ export const ADAPTERS = {
     // OAuth providers do not route from a temp home, so the run uses a model served by opencode's own provider.
     model: () => process.env.PRUNE_OPENCODE_MODEL ?? 'opencode/big-pickle',
     auth: () => (existsSync(join(HOME, '.local/share/opencode/auth.json')) ? null : 'not logged in (no auth.json)'),
-    prepare({ tmp, prompt }) {
+    prepare({ tmp, prompt, model }) {
       const dirs = { home: join(tmp, 'home'), config: join(tmp, 'config'), data: join(tmp, 'data'), cache: join(tmp, 'cache'), state: join(tmp, 'state') };
       for (const d of [dirs.home, join(dirs.config, 'opencode'), join(dirs.data, 'opencode'), join(dirs.cache, 'opencode'), dirs.state]) mkdirSync(d, { recursive: true });
       copyFileSync(join(HOME, '.local/share/opencode/auth.json'), join(dirs.data, 'opencode/auth.json'));
       return {
-        argv: ['run', '--standalone', '--auto', '--format', 'json', '-m', ADAPTERS.opencode.model(), prompt],
+        argv: ['run', '--standalone', '--auto', '--format', 'json', '-m', model ?? ADAPTERS.opencode.model(), prompt],
         env: { HOME: dirs.home, XDG_CONFIG_HOME: dirs.config, XDG_DATA_HOME: dirs.data, XDG_CACHE_HOME: dirs.cache, XDG_STATE_HOME: dirs.state },
       };
     },
@@ -385,12 +448,12 @@ export const ADAPTERS = {
       ADAPTERS.claude.creds = creds;
       return creds ? null : 'not logged in (no stored credentials)';
     },
-    prepare({ tmp, prompt }) {
+    prepare({ tmp, prompt, model }) {
       const cfg = join(tmp, 'claude');
       mkdirSync(cfg);
       mkdirSync(join(tmp, 'home'));
       writeFileSync(join(cfg, '.credentials.json'), `${ADAPTERS.claude.creds}\n`, { mode: 0o600 });
-      return { argv: ['-p', prompt, '--permission-mode', 'bypassPermissions', '--output-format', 'json'], env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg } };
+      return { argv: ['-p', prompt, '--permission-mode', 'bypassPermissions', '--output-format', 'json', ...(model ? ['--model', model] : [])], env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg } };
     },
     collect({ stdout }) {
       let doc = null;
@@ -513,7 +576,8 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
     if (ctx.standardsRel) rmSync(join(wt, ctx.standardsRel), { recursive: true, force: true });
     const prompt = buildPrompt(arm, rule, ctx.probes.get(rule.section));
     const writable = ctx.writable;
-    const { argv, env } = harness.adapter.prepare({ tmp, wt, prompt, writable });
+    const pinned = ctx.models.get(harness.name) ?? null;
+    const { argv, env } = harness.adapter.prepare({ tmp, wt, prompt, writable, model: pinned });
     // Some harnesses take their working directory from $PWD, which a spawn does not update.
     const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: cleanEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs });
     if (res.code !== 0 && THROTTLED.test(`${res.stdout}\n${res.stderr}`)) return { failed: `throttled${tail(res)}`, throttled: true, log: `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX) };
@@ -535,6 +599,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
       arm,
       run: runNumber,
       model: got.model,
+      model_pinned: Boolean(pinned),
       version: harness.version,
       started_at: started.toISOString(),
       finished_at: finished.toISOString(),
@@ -665,6 +730,13 @@ export function createContext(opts, adapters = ADAPTERS) {
     return [s.slice(0, i), s.slice(i + 1)];
   }));
   const harnesses = detectHarnesses(opts.harnesses, skips, adapters);
+  const models = new Map((opts.model ?? []).map((m) => {
+    const i = m.indexOf('=');
+    if (i < 1 || i === m.length - 1) throw new UsageError(`--model wants name=ID, got ${m}`);
+    const name = m.slice(0, i);
+    if (!adapters[name]) throw new UsageError(`--model names no known harness: ${name}`);
+    return [name, m.slice(i + 1)];
+  }));
   const rel = relative(repo, standardsDir);
   const env = Object.fromEntries((opts.env ?? []).map((kv) => {
     const i = kv.indexOf('=');
@@ -672,7 +744,7 @@ export function createContext(opts, adapters = ADAPTERS) {
     return [kv.slice(0, i), kv.slice(i + 1)];
   }));
   return {
-    standardsDir, repo, out, rules, probes, harnesses,
+    standardsDir, repo, out, rules, probes, harnesses, models,
     active: harnesses.filter((h) => h.status === 'ran'),
     activeNames: harnesses.filter((h) => h.status === 'ran').map((h) => h.name),
     standardsRel: rel && !rel.startsWith('..') && !isAbsolute(rel) ? rel : null,
@@ -711,7 +783,8 @@ function writeQuestionFiles(ctx, runs, vmap) {
     for (const r of runs) {
       const v = vmap.byRun.get(runKey(r));
       if (isTiebreak && !(v.votes[graders[0]] !== undefined && v.votes[graders[1]] !== undefined && v.votes[graders[0]] !== v.votes[graders[1]])) continue;
-      qs.push(buildQuestion(ruleBy.get(r.section), r, readFileSync(join(r.dir, 'diff.patch'), 'utf8')));
+      const rule = ruleBy.get(r.section);
+      qs.push(buildQuestion(rule, r, readFileSync(join(r.dir, 'diff.patch'), 'utf8'), siblingContext(ctx.repo, git(ctx.repo, ['rev-parse', 'HEAD']).trim(), rule.text, r.files_changed ?? [])));
     }
     const text = qs.map((q) => JSON.stringify(q)).join('\n') + (qs.length ? '\n' : '');
     writeAtomic(graderFile(out, g, 'questions'), text);
@@ -874,7 +947,7 @@ function harnessRecords(ctx, runs) {
   return ctx.harnesses.map((h) => {
     const model = runs.filter((r) => r.harness === h.name && r.model).map((r) => r.model);
     const models = [...new Set(model)];
-    return { name: h.name, version: h.version, model: models.length === 1 ? models[0] : models.length ? models.join(' | ') : null, status: h.status, reason: h.reason };
+    return { name: h.name, version: h.version, model: models.length === 1 ? models[0] : models.length ? models.join(' | ') : null, model_pinned: ctx.models.has(h.name), status: h.status, reason: h.reason };
   });
 }
 
@@ -918,7 +991,7 @@ export function finish(ctx) {
     const votes = ctx.graders.filter((g) => v.answers[g]).map((g) => ({ grader: g, complied: v.answers[g].answer, confidence: v.answers[g].confidence }));
     const primary = ctx.graders.map((g) => v.answers[g]).find((a) => a?.answered_by === 'judgment-model');
     graded.push({
-      section: r.section, arm: r.arm, harness: r.harness, model: r.model ?? null, date: r.finished_at, run: r.run,
+      section: r.section, arm: r.arm, harness: r.harness, model: r.model ?? null, model_pinned: Boolean(r.model_pinned), date: r.finished_at, run: r.run,
       complied: v.verdict, grader_confidence: primary?.confidence ?? null, votes,
     });
   }
@@ -1018,7 +1091,7 @@ function parse(argv) {
       standards: { type: 'string' }, repo: { type: 'string' }, out: { type: 'string' }, probes: { type: 'string' },
       harnesses: { type: 'string' }, skip: { type: 'string', multiple: true }, sections: { type: 'string' },
       graders: { type: 'string' }, concurrency: { type: 'string' }, 'timeout-min': { type: 'string' }, 'backoff-sec': { type: 'string' },
-      env: { type: 'string', multiple: true }, writable: { type: 'string', multiple: true },
+      env: { type: 'string', multiple: true }, model: { type: 'string', multiple: true }, writable: { type: 'string', multiple: true },
       'prune-json': { type: 'string' }, summary: { type: 'string' }, 'dry-run': { type: 'boolean' },
       section: { type: 'string' }, harness: { type: 'string' }, 'tmp-root': { type: 'string' },
     },

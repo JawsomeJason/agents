@@ -28,7 +28,7 @@ Accepts an area slug or §. See [scope](scope.md) for the forms and how to resol
 
 - Give each run a fresh temporary home directory. Copy in only what the harness needs to authenticate. User-level instruction files and skills would otherwise leak rules into the no-rule arm.
 - Give each run a fresh `git worktree` of the target repo at HEAD, with the standards folder deleted from it. Only the arm's text should carry the rule. The runner takes the worktrees from a one-commit clone with no remote, so an agent cannot read later history to find the change it was asked for.
-- Run each harness on its default model. Users run the default, so that is the model a rule has to work on.
+- Run each harness on its default model. Users run the default, so that is the model a rule has to work on. When quota rules that out, pass `--model name=ID` to pin a harness to another model. The runs record the pin (`model_pinned`), and the report says the decisions rest on a pinned model, not the default.
 - Mark a harness that cannot authenticate or cannot run headless as skipped, with the reason. A skipped harness never counts as complying. Name the harnesses to run with `--harnesses`; every other harness the runner knows is recorded as skipped with the reason `not requested`, so it is not mistaken for a failure. Pass `--skip name:reason` for a harness that is installed but cannot run now. When a provider keeps refusing work for lack of quota, the runner halts that harness for the step and keeps the runs that finished. Later, drop the `--skip` and run `step` again: the runs that exist stay, and the harness catches up.
 - A run that ends with no change, a timeout or an error is not a run. The runner retries it up to 3 times, logs each failure in `failures.jsonl`, and counts only runs that left a diff.
 
@@ -97,6 +97,8 @@ Show the planned edits as a diff, then apply them.
 ## Step 5. Write prune.json
 
 Write `prune.json` into the standards folder, beside its `SKILL.md`, per [the prune schema](schemas/prune.schema.json). `finish` writes it. Record every harness with its model ID and status, every rule with its probe, tallies, lift and decision, and every graded run with its harness, model ID and date. Lift is compliance with the rule minus compliance without it, per harness and pooled, for each rule arm that ran. It is the writing-side value of the rule. A deleted rule has no lift, because its rule arms never ran. `finish` recounts every tally from the graded runs and refuses to write when they differ.
+
+Grade with the context a reviewer would have. `step` adds to each question the files the rule points at and the changed files' sibling files from the checkout the runs branched from, because a rule such as "match the sibling" cannot be judged from the diff alone.
 
 Mark a decision provisional when it rests on fewer harnesses than are installed or on a grader that did not pass calibration. A rerun with the missing harness replaces it.
 
