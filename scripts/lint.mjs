@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -109,8 +110,8 @@ function maskCode(text, maskInline) {
 
 const isQuote = (line) => /^\s*>/.test(line);
 
-// Code files are scanned raw: their backticks and fences are not Markdown.
-const RAW_SCOPES = new Set(['code']);
+// Code and other tracked files are scanned raw: their backticks and fences are not Markdown.
+const RAW_SCOPES = new Set(['code', 'tracked']);
 
 // quoteExempt lists rules that skip blockquoted lines, where generated standards quote reviewers verbatim.
 function scanDenylists(file, text, scope, report, { skip = [], quoteExempt = [] } = {}) {
@@ -271,6 +272,15 @@ function lintMarketplace(root, report) {
   }
 }
 
+const blank = (text, phrases) => phrases.reduce((t, p) => t.split(p).join(' '.repeat(p.length)), text);
+
+/** The files git would ship from root: tracked plus untracked-but-not-ignored. Outside git, every file. */
+function repoFiles(root) {
+  const r = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' });
+  if (r.status === 0) return [...new Set(r.stdout.split('\0').filter(Boolean))].filter((f) => existsSync(join(root, f)) && statSync(join(root, f)).isFile());
+  return listFiles(root, () => true).map((f) => relative(root, f).split(sep).join('/'));
+}
+
 function findSkillDirs(dir) {
   return listFiles(dir, (f) => basename(f) === 'SKILL.md').map(dirname).sort();
 }
@@ -287,15 +297,25 @@ export function lint(target) {
     const pluginsDir = join(root, 'plugins');
     const skillDirs = existsSync(pluginsDir) ? findSkillDirs(pluginsDir) : [];
     skillDirs.forEach((d) => lintSkill(d, report));
-    const docs = ['AGENTS.md', 'README.md'].map((f) => join(root, f));
-    if (existsSync(pluginsDir)) {
-      for (const p of readdirSync(pluginsDir)) docs.push(join(pluginsDir, p, 'README.md'));
-    }
-    for (const doc of docs.filter((d) => existsSync(d))) {
+    // Every other file the repo ships: Markdown docs get the doc rules, and everything else the identity rule.
+    const inSkill = (rel) => /^plugins\/[^/]+\/skills\//.test(rel);
+    for (const rel of repoFiles(root)) {
+      if (inSkill(rel) || rel.split('/').includes('lint-fixtures') || RULES.identityExempt.includes(rel)) continue;
+      const file = join(root, rel);
+      const raw = readFileSync(file);
+      if (raw.subarray(0, 8000).includes(0)) continue;
       // The repo's own install slug is the one identity a doc must carry, so it is blanked first.
-      let text = readFileSync(doc, 'utf8');
-      for (const phrase of RULES.docAllow) text = text.split(phrase).join(' '.repeat(phrase.length));
-      scanDenylists(doc, text, 'doc', report);
+      let text = blank(raw.toString('utf8'), RULES.docAllow);
+      if (rel.endsWith('.md')) {
+        scanDenylists(file, text, 'doc', report);
+        continue;
+      }
+      // The install manifests must name their author, so those objects are blanked.
+      if (/(^|\/)\.claude-plugin\/[^/]+\.json$/.test(rel)) {
+        const keys = RULES.manifestIdentityKeys.join('|');
+        text = text.replace(new RegExp(`"(?:${keys})"\\s*:\\s*\\{[^}]*\\}`, 'g'), (m) => m.replace(/[^\n]/g, ' '));
+      }
+      scanDenylists(file, text, 'tracked', report);
     }
   } else {
     const skillDirs = findSkillDirs(root);

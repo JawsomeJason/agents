@@ -40,6 +40,8 @@ const expected = {
   'url-allowlist': 'url-allowlist',
   'vendor-name': 'vendor-name',
   'skill-code-url': 'url-allowlist',
+  'tracked-identity': 'org-term',
+  'doc-history': 'history-word',
 };
 
 const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term', 'fence-nested'];
@@ -114,4 +116,11 @@ test('a ``` line inside a ```` fence stays code, so a time word there passes', (
 
 test('a skill script is scanned, and only a schema\'s top-level $schema URL is exempt', () => {
   assert.deepEqual(lint(fixture('skill-code-url')).map((e) => `${e.file.split('/').slice(-2).join('/')}:${e.line}`), ['scripts/fetch.mjs:1']);
+});
+
+test('every shipped file is scanned for identity, except LICENSE and the manifests\' author objects', () => {
+  const cli = fileURLToPath(new URL('./lint.mjs', import.meta.url));
+  const target = fixture('tracked-identity');
+  const run = spawnSync(process.execPath, [cli, target], { encoding: 'utf8', env: { ...process.env, STANDARDS_LINT_PRIVATE_DENYLIST: fixture('private-term/denylist.json') } });
+  assert.deepEqual(run.stdout.trim().split('\n').map((l) => l.split(' ').slice(0, 2).join(' ').replace(/^.*tracked-identity\//, '')), ['plan.txt:1 org-term', 'plan.txt:2 org-term']);
 });

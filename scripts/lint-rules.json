@@ -13,6 +13,8 @@
   "generatedQuoteExempt": ["time-word"],
   "urlAllowlist": ["agentskills.io"],
   "docAllow": ["JawsomeJason/jawsome-agents"],
+  "identityExempt": ["LICENSE", "scripts/lint-rules.json"],
+  "manifestIdentityKeys": ["author", "owner"],
   "denylists": [
     {
       "rule": "harness-tool",
@@ -111,6 +113,19 @@
       ]
     },
     {
+      "rule": "history-word",
+      "message": "narrates the repo's history, which a reader of the current files never saw; state what is true",
+      "scopes": ["doc"],
+      "skipInlineCode": true,
+      "flags": "i",
+      "patterns": [
+        "\\bno longer\\b",
+        "\\banymore\\b",
+        "\\bfor now\\b",
+        "\\b(?:before|after) this change\\b"
+      ]
+    },
+    {
       "rule": "absolute-date",
       "message": "absolute dates belong in data files, not prose",
       "scopes": ["skill", "doc"],
@@ -127,7 +142,7 @@
     {
       "rule": "org-term",
       "message": "names a person, org or private location; skills must work for any user",
-      "scopes": ["skill", "doc", "code"],
+      "scopes": ["skill", "doc", "code", "tracked"],
       "skipInlineCode": false,
       "flags": "i",
       "patterns": [
