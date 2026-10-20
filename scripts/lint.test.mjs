@@ -43,6 +43,7 @@ const expected = {
   'tracked-identity': 'org-term',
   'doc-history': 'history-word',
   'workflow-pin': 'workflow-pin',
+  'manifest-sync': 'manifest-sync',
 };
 
 const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term', 'fence-nested'];

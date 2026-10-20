@@ -261,6 +261,14 @@ function lintMarketplace(root, report) {
       report(file, 1, 'marketplace-plugins', `"${entry.name}" has a source that is not a ./plugins/* path; this repo lists only its own plugins`);
     } else if (!onDisk.includes(dir)) {
       report(file, 1, 'marketplace-plugins', `"${entry.name}" source "${entry.source}" is not a plugins/* directory`);
+    } else {
+      // The listing and the plugin's own manifest are written by hand twice, so they must say the same thing.
+      const pluginFile = join(pluginsDir, dir, '.claude-plugin', 'plugin.json');
+      const plugin = existsSync(pluginFile) ? JSON.parse(readFileSync(pluginFile, 'utf8')) : {};
+      if (entry.name !== dir || plugin.name !== dir) report(file, 1, 'manifest-sync', `"${entry.name}": the entry name, plugin.json's name ("${plugin.name}") and the folder name ("${dir}") must match`);
+      for (const key of ['version', 'description']) {
+        if (entry[key] !== undefined && entry[key] !== plugin[key]) report(file, 1, 'manifest-sync', `"${entry.name}" ${key} differs from plugins/${dir}/.claude-plugin/plugin.json`);
+      }
     }
   }
   if (existsSync(pluginsDir)) {
