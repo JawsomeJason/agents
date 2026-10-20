@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -454,4 +455,133 @@ test('a pinned model reaches the harness and is recorded in the runs and prune.j
   assert.ok(record.runs.every((r) => r.model_pinned === true));
   assert.deepEqual(validate(loadSchema('prune'), record), []);
   assert.throws(() => createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, model: ['nope=x'], log: () => {} }, { fake: adapter }), /no known harness/);
+});
+
+// ---------------------------------------------------------------------------------------------
+// Login copies never outlive the process
+
+const PRUNE = fileURLToPath(new URL('../skills/standards/scripts/prune.mjs', import.meta.url));
+
+/** Runs a trial in a child process whose fake agent copies a login, then waits; returns once the agent is running. */
+function childTrial(fx, how) {
+  const tmpRoot = join(fx.dir, 'tmp-root');
+  mkdirSync(tmpRoot);
+  const pidFile = join(fx.dir, 'agent.pid');
+  const script = join(fx.dir, 'child.mjs');
+  writeFileSync(script, `
+    import { writeFileSync, statSync } from 'node:fs';
+    import { join } from 'node:path';
+    const { createContext, trial } = await import(${JSON.stringify(PRUNE)});
+    const agent = {
+      command: 'sh',
+      auth: () => null,
+      prepare({ tmp, scratch, wt }) {
+        writeFileSync(join(tmp, 'auth.json'), 'SECRET\\n', { mode: 0o600 });
+        writeFileSync(${JSON.stringify(join(fx.dir, 'scratch-mode'))}, (statSync(scratch).mode & 0o777).toString(8));
+        if (${JSON.stringify(how)} === 'throw') setTimeout(() => { throw new Error('boom'); }, 500);
+        return { argv: ['-c', 'echo $$ > ${pidFile}; exec sleep 30'], env: {} };
+      },
+      collect: () => ({ message: 'done', model: 'm', usage: null }),
+    };
+    const ctx = createContext({ standards: ${JSON.stringify(fx.standards)}, repo: ${JSON.stringify(fx.repo)}, out: ${JSON.stringify(fx.out)}, probes: ${JSON.stringify(fx.probes)}, harnesses: ['fake'], graders: ['a'], 'tmp-root': ${JSON.stringify(tmpRoot)}, log: () => {} }, { fake: agent });
+    await trial(ctx, '§1.1', 'fake');
+  `);
+  const child = spawn(process.execPath, [script], { stdio: 'ignore' });
+  const exited = new Promise((done) => child.on('exit', (code, signal) => done({ code, signal })));
+  const started = new Promise((done, fail) => {
+    const poll = setInterval(() => {
+      if (existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim()) {
+        clearInterval(poll);
+        done(Number(readFileSync(pidFile, 'utf8')));
+      }
+    }, 20);
+    exited.then(() => { clearInterval(poll); fail(new Error('the child exited before its agent started')); });
+  });
+  started.catch(() => {});
+  return { child, exited, started, tmpRoot };
+}
+
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  test(`${signal} removes the private scratch with its login copy and kills the agent`, async () => {
+    const fx = fixture();
+    const { child, exited, started, tmpRoot } = childTrial(fx, 'wait');
+    const agentPid = await started;
+    const [scratch] = readdirSync(tmpRoot);
+    assert.match(scratch, /^standards-prune-/);
+    assert.equal(readFileSync(join(fx.dir, 'scratch-mode'), 'utf8'), '700', 'only the owner can read the scratch');
+    child.kill(signal);
+    assert.deepEqual(await exited, { code: null, signal });
+    assert.deepEqual(readdirSync(tmpRoot), [], 'nothing is left under the temp root');
+    await new Promise((done) => setTimeout(done, 100));
+    assert.equal(alive(agentPid), false, 'the agent died with the runner');
+  });
+}
+
+test('an uncaught error removes the private scratch with its login copy', async () => {
+  const fx = fixture();
+  const { exited, started, tmpRoot } = childTrial(fx, 'throw');
+  const agentPid = await started;
+  assert.equal((await exited).code, 1);
+  assert.deepEqual(readdirSync(tmpRoot), []);
+  await new Promise((done) => setTimeout(done, 100));
+  assert.equal(alive(agentPid), false);
+});
+
+test('a finished trial leaves nothing under the temp root', async () => {
+  const fx = fixture();
+  const tmpRoot = join(fx.dir, 'tmp-root');
+  mkdirSync(tmpRoot);
+  await trial(context(fx, 'rule', { 'tmp-root': tmpRoot }), '§1.1', 'fake');
+  assert.deepEqual(readdirSync(tmpRoot), []);
+});
+
+/** Every file path under a folder. */
+const filesUnder = (dir) => readdirSync(dir, { recursive: true }).map((p) => join(dir, p)).filter((p) => statSync(p).isFile());
+
+test('with CLAUDE_CODE_OAUTH_TOKEN set, the claude adapter passes the token in its environment and writes no login file', () => {
+  const dir = tempDir();
+  const tmp = join(dir, 'run');
+  mkdirSync(tmp);
+  const saved = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  process.env.CLAUDE_CODE_OAUTH_TOKEN = 'tok-FAKE';
+  try {
+    assert.equal(prune.ADAPTERS.claude.auth(), null);
+    const { env } = prune.ADAPTERS.claude.prepare({ tmp, scratch: dir, prompt: 'P', model: null });
+    assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, 'tok-FAKE');
+    assert.equal(env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB, '1');
+    assert.equal(env.CLAUDE_CONFIG_DIR, join(tmp, 'claude'), 'a config folder per run, removed with the run');
+    assert.deepEqual(filesUnder(dir).filter((f) => readFileSync(f, 'utf8').includes('tok-FAKE')), []);
+  } finally {
+    if (saved === undefined) delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    else process.env.CLAUDE_CODE_OAUTH_TOKEN = saved;
+  }
+});
+
+test('without a token, the claude adapter writes the login once per process into the private scratch, owner-only', () => {
+  const dir = tempDir();
+  const saved = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  prune.ADAPTERS.claude.creds = '{"fake":true}';
+  try {
+    for (const n of [1, 2]) {
+      const tmp = join(dir, `run${n}`);
+      mkdirSync(tmp);
+      const { env } = prune.ADAPTERS.claude.prepare({ tmp, scratch: dir, prompt: 'P', model: null });
+      assert.equal(env.CLAUDE_CONFIG_DIR, join(dir, 'claude'));
+    }
+    assert.equal(statSync(join(dir, 'claude')).mode & 0o777, 0o700);
+    assert.equal(statSync(join(dir, 'claude/.credentials.json')).mode & 0o777, 0o600);
+  } finally {
+    delete prune.ADAPTERS.claude.creds;
+    if (saved !== undefined) process.env.CLAUDE_CODE_OAUTH_TOKEN = saved;
+  }
 });

@@ -41,6 +41,7 @@ const USAGE = [
   '  --dry-run           print what step would run, and run nothing',
   '',
   'The harnesses found on this machine: codex, opencode, claude. Run with --help for this text.',
+  'Set CLAUDE_CODE_OAUTH_TOKEN (from claude setup-token) and claude takes its login from the environment, with no copy on disk.',
 ].join('\n');
 
 export const ARMS = ['none', 'one-liner', 'full'];
@@ -366,6 +367,55 @@ export function checkAnswers(questions, answers) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Private scratch
+
+function killGroup(pid) {
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // the process already exited
+    }
+  }
+}
+
+/**
+ * One folder per process, readable only by its owner, for every run's temp home and login copy.
+ * It is removed on a normal exit, an uncaught error, SIGINT and SIGTERM, and by dispose(). A signal
+ * also kills the agents first: each runs in its own process group, so a terminal's Ctrl-C never reaches it.
+ */
+export function privateDir(parent, prefix = 'standards-prune-') {
+  const dir = mkdtempSync(join(parent, prefix));
+  const children = new Set();
+  const remove = () => {
+    for (const pid of children) killGroup(pid);
+    rmSync(dir, { recursive: true, force: true });
+  };
+  const onSignal = (signal) => {
+    remove();
+    process.kill(process.pid, signal);
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  process.once('exit', remove);
+  return {
+    dir,
+    track(child) {
+      children.add(child.pid);
+      child.once('close', () => children.delete(child.pid));
+    },
+    dispose() {
+      process.off('SIGINT', onSignal);
+      process.off('SIGTERM', onSignal);
+      process.off('exit', remove);
+      remove();
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Harness adapters
 
 function cleanEnv(extra) {
@@ -453,21 +503,32 @@ export const ADAPTERS = {
   },
   claude: {
     command: 'claude',
+    // A token from `claude setup-token` in CLAUDE_CODE_OAUTH_TOKEN reaches the harness through its environment, and no login is copied to disk.
     auth() {
+      if (process.env.CLAUDE_CODE_OAUTH_TOKEN) return null;
       const r = spawnSync('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], { encoding: 'utf8' });
       let creds = r.status === 0 ? r.stdout.trim() : '';
       if (!creds && existsSync(join(HOME, '.claude/.credentials.json'))) creds = readFileSync(join(HOME, '.claude/.credentials.json'), 'utf8').trim();
       ADAPTERS.claude.creds = creds;
       return creds ? null : 'not logged in (no stored credentials)';
     },
-    prepare({ tmp, prompt, model }) {
-      // One config folder for every run: the harness keys its stored login by this path, so a folder per run
-      // would leave one keychain entry per run behind.
-      const cfg = join(tmpdir(), 'standards-prune-claude');
-      mkdirSync(cfg, { recursive: true });
+    prepare({ tmp, scratch, prompt, model }) {
       tempHome(join(tmp, 'home'));
-      writeFileSync(join(cfg, '.credentials.json'), `${ADAPTERS.claude.creds}\n`, { mode: 0o600 });
-      return { argv: ['-p', prompt, '--permission-mode', 'bypassPermissions', '--output-format', 'json', ...(model ? ['--model', model] : [])], env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg } };
+      const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      let cfg = join(tmp, 'claude');
+      if (token) mkdirSync(cfg);
+      else {
+        // The stored login goes in one config folder per process, inside the private scratch: the harness keys
+        // its keychain entry by this path, so a folder per run would leave an entry per run behind.
+        cfg = join(scratch, 'claude');
+        if (!existsSync(cfg)) {
+          mkdirSync(cfg, { mode: 0o700 });
+          writeFileSync(join(cfg, '.credentials.json'), `${ADAPTERS.claude.creds}\n`, { mode: 0o600, flag: 'wx' });
+        }
+      }
+      // The scrub keeps the token out of the commands the agent runs.
+      const auth = token ? { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' } : {};
+      return { argv: ['-p', prompt, '--permission-mode', 'bypassPermissions', '--output-format', 'json', ...(model ? ['--model', model] : [])], env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg, ...auth } };
     },
     collect({ stdout }) {
       let doc = null;
@@ -540,9 +601,10 @@ const locked = (fn) => {
   return next;
 };
 
-function runProcess(cmd, argv, { cwd, env, timeoutMs }) {
+function runProcess(cmd, argv, { cwd, env, timeoutMs, track }) {
   return new Promise((done) => {
     const child = spawn(cmd, argv, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    track?.(child);
     let stdout = '';
     let stderr = '';
     let timedOut = false;
@@ -582,7 +644,8 @@ export function captureDiff(wt, head) {
  * { failed } when the session produced nothing usable.
  */
 export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
-  const tmp = mkdtempSync(join(ctx.tmpRoot, 'prune-'));
+  ctx.scratch ??= privateDir(ctx.tmpRoot);
+  const tmp = mkdtempSync(join(ctx.scratch.dir, 'run-'));
   const wt = join(tmp, 'wt');
   const started = new Date();
   try {
@@ -591,9 +654,9 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
     const prompt = buildPrompt(arm, rule, ctx.probes.get(rule.section));
     const writable = ctx.writable;
     const pinned = ctx.models.get(harness.name) ?? null;
-    const { argv, env } = harness.adapter.prepare({ tmp, wt, prompt, writable, model: pinned });
+    const { argv, env } = harness.adapter.prepare({ tmp, scratch: ctx.scratch.dir, wt, prompt, writable, model: pinned });
     // Some harnesses take their working directory from $PWD, which a spawn does not update.
-    const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: cleanEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs });
+    const res = await runProcess(harness.adapter.command, argv, { cwd: wt, env: cleanEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
     if (res.code !== 0 && THROTTLED.test(`${res.stdout}\n${res.stderr}`)) return { failed: `throttled${tail(res)}`, throttled: true, log: `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX) };
     const { diff, files } = captureDiff(wt, ctx.head);
     const got = harness.adapter.collect({ tmp, stdout: res.stdout, stderr: res.stderr });
@@ -848,7 +911,11 @@ export async function step(ctx) {
   }
 
   const dirtBefore = git(ctx.repo, ['status', '--porcelain']);
-  await runJobs(ctx, jobs);
+  try {
+    await runJobs(ctx, jobs);
+  } finally {
+    releaseScratch(ctx);
+  }
   if (git(ctx.repo, ['status', '--porcelain']) !== dirtBefore) ctx.log(`WARNING: ${ctx.repo} changed during the step. An agent wrote outside its worktree; restore the repo and redo the runs.`);
 
   const after = scopedRuns(ctx);
@@ -859,6 +926,11 @@ export async function step(ctx) {
   for (const [g, s] of Object.entries(files)) ctx.log(`grader ${g}: ${s.unanswered} of ${s.questions} questions unanswered in ${graderFile(ctx.out, g, 'questions')}`);
   writeAtomic(join(ctx.out, 'harnesses.json'), `${JSON.stringify(harnessRecords(ctx, after), null, 2)}\n`);
   return { jobs: jobs.length, files };
+}
+
+function releaseScratch(ctx) {
+  ctx.scratch?.dispose();
+  ctx.scratch = null;
 }
 
 async function runJobs(ctx, jobs) {
@@ -931,7 +1003,12 @@ export async function trial(ctx, section, harnessName) {
   ctx.head = head;
   const dest = join(ctx.out, 'trial', `${sectionSlug(section)}-${harnessName}`);
   rmSync(dest, { recursive: true, force: true });
-  const r = await executeRun(ctx, harness, rule, 'none', 1, { dest });
+  let r;
+  try {
+    r = await executeRun(ctx, harness, rule, 'none', 1, { dest });
+  } finally {
+    releaseScratch(ctx);
+  }
   if (!r.record) {
     if (r.log) writeAtomic(join(dest, 'failed.log'), r.log);
     ctx.log(`trial failed: ${r.failed}`);

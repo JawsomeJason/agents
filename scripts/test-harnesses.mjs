@@ -8,9 +8,11 @@
 //
 // Needs real auth and spends real quota, so it stays out of CI. Run it before each release.
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { delimiter, join, resolve } from 'node:path';
+import { basename, delimiter, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { privateDir } from '../plugins/standards/skills/standards/scripts/prune.mjs';
 
 const repo = resolve(import.meta.dirname, '..');
 const HOME = homedir();
@@ -24,17 +26,15 @@ const PROMPT =
   'Follow its instructions for that case and reply with exactly what it tells you to show. ' +
   'Do not run any other command and do not change any file.';
 
-const args = process.argv.slice(2);
-if (args.includes('--help') || args.includes('-h')) {
-  console.log(`usage: node scripts/test-harnesses.mjs [--harness claude,codex,opencode] [--keep]
+const USAGE = `usage: node scripts/test-harnesses.mjs [--harness claude,codex,opencode] [--keep]
 
 Runs the standards skill with no argument in each installed harness and checks the reply
-holds its menu. Needs each harness's login and spends real quota. --keep leaves the temp homes.`);
-  process.exit(0);
-}
-const keep = args.includes('--keep');
-const hIdx = args.indexOf('--harness');
-const only = hIdx >= 0 ? args[hIdx + 1].split(',') : null;
+holds its menu. Needs each harness's login and spends real quota. --keep leaves the temp homes,
+with every login copy deleted from them. With CLAUDE_CODE_OAUTH_TOKEN set (from claude setup-token),
+claude takes its login from the environment and none is copied to disk.`;
+
+// Login copies a kept temp home must not carry.
+const LOGIN_FILES = ['claude/.credentials.json', 'codex/auth.json', 'data/opencode/auth.json'];
 
 /** The menu lines from the fenced block under `## Menu`, whitespace collapsed. */
 function menuLines() {
@@ -71,14 +71,15 @@ function install(harness, env) {
   if (r.status !== 0 || !/applied: [1-9]/.test(r.stdout)) throw new Error(`install.sh failed: ${r.stdout}${r.stderr}`);
 }
 
-function run(cmd, argv, cwd, env) {
+function run(cmd, argv, cwd, env, scratch) {
   return new Promise((done) => {
-    const child = spawn(cmd, argv, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(cmd, argv, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+    scratch.track(child);
     let out = '';
     let err = '';
     child.stdout.on('data', (d) => (out += d));
     child.stderr.on('data', (d) => (err += d));
-    const timer = setTimeout(() => child.kill('SIGKILL'), TIMEOUT_MS);
+    const timer = setTimeout(() => process.kill(-child.pid, 'SIGKILL'), TIMEOUT_MS);
     child.on('close', (code, signal) => {
       clearTimeout(timer);
       done({ out, err, code: signal ? `killed (${signal}, timeout ${TIMEOUT_MS / 1000}s)` : code });
@@ -88,9 +89,10 @@ function run(cmd, argv, cwd, env) {
 
 // Each harness: auth() returns a skip reason or null; setup() builds the temp home and
 // returns the command to run.
-const HARNESSES = {
+export const HARNESSES = {
   claude: {
     auth() {
+      if (process.env.CLAUDE_CODE_OAUTH_TOKEN) return null;
       this.creds = spawnSync('security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'], { encoding: 'utf8' })
         .stdout?.trim();
       if (!this.creds && existsSync(join(HOME, '.claude/.credentials.json'))) {
@@ -100,15 +102,15 @@ const HARNESSES = {
     },
     setup(tmp) {
       const cfg = join(tmp, 'claude');
-      mkdirSync(cfg);
-      writeFileSync(join(cfg, '.credentials.json'), `${this.creds}\n`);
-      chmodSync(join(cfg, '.credentials.json'), 0o600);
+      mkdirSync(cfg, { mode: 0o700 });
+      const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      if (!token) writeFileSync(join(cfg, '.credentials.json'), `${this.creds}\n`, { mode: 0o600, flag: 'wx' });
       // Claude Code installs through the marketplace; --plugin-dir loads the same plugin folder.
       return {
         cmd: 'claude',
         argv: ['-p', PROMPT, '--model', CLAUDE_MODEL, '--plugin-dir', join(repo, 'plugins/standards'),
           '--permission-mode', 'bypassPermissions', '--max-turns', '8'],
-        env: cleanEnv({ CLAUDE_CONFIG_DIR: cfg }),
+        env: cleanEnv({ CLAUDE_CONFIG_DIR: cfg, ...(token ? { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' } : {}) }),
       };
     },
   },
@@ -154,42 +156,66 @@ const HARNESSES = {
   },
 };
 
-async function check(name, menu) {
-  const h = HARNESSES[name];
-  if (!onPath(name)) return { name, status: 'skip', reason: `${name} not on PATH` };
+async function check(name, h, menu, scratch, kept) {
+  const bin = h.command ?? name;
+  if (!onPath(bin)) return { name, status: 'skip', reason: `${bin} not on PATH` };
   const noAuth = h.auth();
   if (noAuth) return { name, status: 'skip', reason: noAuth };
-  const tmp = mkdtempSync(join(tmpdir(), `harness-${name}-`));
+  const tmp = mkdtempSync(join(scratch.dir, `${name}-`));
+  const keptAt = kept ? join(kept, basename(tmp)) : null;
   try {
     const proj = join(tmp, 'proj');
     mkdirSync(proj);
     spawnSync('git', ['init', '-q', proj]);
     const { cmd, argv, env } = h.setup(tmp);
-    const r = await run(cmd, argv, proj, env);
+    const r = await run(cmd, argv, proj, env, scratch);
     writeFileSync(join(tmp, 'output.txt'), `${r.out}\n--- stderr ---\n${r.err}`);
     const said = norm(r.out);
     const missing = menu.filter((line) => !said.includes(line));
     const tail = `${r.out}\n${r.err}`.trim().split('\n').slice(-20).join('\n');
-    if (!missing.length) return { name, status: 'pass', reason: `menu printed (${menu.length} lines), exit ${r.code}`, tmp };
+    if (!missing.length) return { name, status: 'pass', reason: `menu printed (${menu.length} lines), exit ${r.code}`, tmp: keptAt };
     const hint = /argument-hint/i.test(r.err + r.out) ? '; output mentions argument-hint' : '';
-    return { name, status: 'fail', reason: `exit ${r.code}; ${missing.length}/${menu.length} menu lines missing${hint}`, missing, tail, tmp };
+    return { name, status: 'fail', reason: `exit ${r.code}; ${missing.length}/${menu.length} menu lines missing${hint}`, missing, tail, tmp: keptAt };
   } catch (e) {
-    return { name, status: 'fail', reason: `runner error: ${e.message}`, tmp };
+    return { name, status: 'fail', reason: `runner error: ${e.message}`, tmp: keptAt };
   } finally {
-    if (!keep) rmSync(tmp, { recursive: true, force: true });
+    // A kept home leaves the private scratch, which is removed at exit, with every login copy deleted first.
+    if (keptAt) {
+      for (const f of LOGIN_FILES) rmSync(join(tmp, f), { force: true });
+      renameSync(tmp, keptAt);
+    } else rmSync(tmp, { recursive: true, force: true });
   }
 }
 
-const menu = menuLines();
-const names = Object.keys(HARNESSES).filter((n) => !only || only.includes(n));
-const results = await Promise.all(names.map((n) => check(n, menu)));
-for (const r of results) {
-  console.log(`${r.status.toUpperCase().padEnd(4)} ${r.name.padEnd(8)} ${r.reason}${keep && r.tmp ? ` (kept ${r.tmp})` : ''}`);
-  if (r.status === 'fail') {
-    for (const m of r.missing ?? []) console.log(`       missing: ${m}`);
-    if (r.tail) console.log(r.tail.replace(/^/gm, '       | '));
+/** Runs the check in each harness; returns the exit code. */
+export async function main(args, harnesses = HARNESSES) {
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(USAGE);
+    return 0;
+  }
+  const keep = args.includes('--keep');
+  const hIdx = args.indexOf('--harness');
+  const only = hIdx >= 0 ? args[hIdx + 1].split(',') : null;
+  const menu = menuLines();
+  // Every temp home and login copy lives in one owner-only folder, removed on exit, on an uncaught error, SIGINT and SIGTERM.
+  const scratch = privateDir(tmpdir(), 'harness-');
+  const kept = keep ? mkdtempSync(join(tmpdir(), 'harness-kept-')) : null;
+  try {
+    const names = Object.keys(harnesses).filter((n) => !only || only.includes(n));
+    const results = await Promise.all(names.map((n) => check(n, harnesses[n], menu, scratch, kept)));
+    for (const r of results) {
+      console.log(`${r.status.toUpperCase().padEnd(4)} ${r.name.padEnd(8)} ${r.reason}${r.tmp ? ` (kept ${r.tmp})` : ''}`);
+      if (r.status === 'fail') {
+        for (const m of r.missing ?? []) console.log(`       missing: ${m}`);
+        if (r.tail) console.log(r.tail.replace(/^/gm, '       | '));
+      }
+    }
+    const fails = results.filter((r) => r.status === 'fail').length;
+    console.log(`harnesses: ${results.filter((r) => r.status === 'pass').length} pass, ${fails} fail, ${results.filter((r) => r.status === 'skip').length} skip`);
+    return fails ? 1 : 0;
+  } finally {
+    scratch.dispose();
   }
 }
-const fails = results.filter((r) => r.status === 'fail').length;
-console.log(`harnesses: ${results.filter((r) => r.status === 'pass').length} pass, ${fails} fail, ${results.filter((r) => r.status === 'skip').length} skip`);
-process.exit(fails ? 1 : 0);
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await main(process.argv.slice(2));
