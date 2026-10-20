@@ -315,8 +315,20 @@ test('a rule decided on fewer harnesses than were requested is provisional', asy
   }, adapters);
   const record = await runToDecision(fx, makeCtx);
   assert.deepEqual(record.rules.map((r) => [r.section, r.decision, r.provisional]), [['§1.1', 'one-liner', true]]);
-  assert.match(record.provisional, /^Decided on 1 of 2 requested harnesses; did not run: other \(not logged in\)/);
+  assert.match(record.provisional, /^Decided on 1 of 2 harnesses; did not run: other \(not logged in\)/);
   assert.deepEqual(validate(loadSchema('prune'), record), []);
+});
+
+test('a harness left out of --harnesses keeps the decision provisional when it is installed and logged in', async () => {
+  const fx = fixture();
+  const adapters = { fake: fakeAdapter(), other: fakeAdapter(), absent: { ...fakeAdapter(), command: 'no-such-harness-on-path' } };
+  const makeCtx = () => createContext({
+    standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'],
+    graders: ['a', 'b'], sections: ['§1.1'], 'prune-json': join(fx.out, 'prune.json'), log: () => {},
+  }, adapters);
+  const record = await runToDecision(fx, makeCtx);
+  assert.deepEqual(record.rules.map((r) => [r.section, r.provisional]), [['§1.1', true]]);
+  assert.match(record.provisional, /^Decided on 1 of 2 harnesses; did not run: other \(not requested\)\. /, 'a harness that is not installed does not count');
 });
 
 test('a split between the first two graders goes to the tiebreaker', async () => {

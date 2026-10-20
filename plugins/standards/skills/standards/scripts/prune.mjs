@@ -622,7 +622,10 @@ export function detectHarnesses(names, skips, adapters = ADAPTERS) {
   const chosen = names?.length ? names : Object.keys(adapters);
   const out = [];
   for (const name of Object.keys(adapters).filter((n) => !chosen.includes(n))) {
-    out.push({ name, status: 'skipped', reason: skips.get(name) ?? 'not requested', version: null, adapter: adapters[name] });
+    // An unrequested harness that could have run still leaves the decision provisional, so record whether it could.
+    const adapter = adapters[name];
+    const usable = onPath(adapter.command) && !adapter.auth();
+    out.push({ name, status: 'skipped', reason: skips.get(name) ?? 'not requested', version: null, adapter, usable });
   }
   for (const name of chosen) {
     const adapter = adapters[name];
@@ -1236,11 +1239,14 @@ export function reconcile(record) {
   return out;
 }
 
-/** Why the decisions may change, or null: a requested harness that did not run, or a grader that did not pass calibration. */
+/**
+ * Why the decisions may change, or null: a harness that did not run although it was requested or is installed and
+ * logged in, or a grader that did not pass calibration.
+ */
 function provisionalReason(ctx, calibration) {
   const reasons = [];
-  const missing = ctx.harnesses.filter((h) => ctx.requested.includes(h.name) && h.status !== 'ran').map((h) => `${h.name} (${h.reason})`);
-  if (missing.length) reasons.push(`Decided on ${ctx.active.length} of ${ctx.requested.length} requested harnesses; did not run: ${missing.join(', ')}. Rerun step and finish with them to confirm.`);
+  const missing = ctx.harnesses.filter((h) => h.status !== 'ran' && (ctx.requested.includes(h.name) || h.usable)).map((h) => `${h.name} (${h.reason})`);
+  if (missing.length) reasons.push(`Decided on ${ctx.active.length} of ${ctx.active.length + missing.length} harnesses; did not run: ${missing.join(', ')}. Rerun step and finish with them to confirm.`);
   if (!calibration) reasons.push(`The grader was not calibrated against human labels; pass --calibration with at least ${CALIBRATION_MIN}.`);
   else if (!calibration.passed) reasons.push(`The grader agreed with ${calibration.agreed} of ${calibration.labeled} human labels, under ${CALIBRATION_PASS * 100}%.`);
   return reasons.length ? reasons.join(' ') : null;
