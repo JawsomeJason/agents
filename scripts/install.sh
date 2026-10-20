@@ -66,6 +66,7 @@ for t in $targets; do
     src=${src%/}
     name=$(basename "$src")
     dest=$dir/$name
+    was=""
     if [ -L "$dest" ]; then
       if [ "$(readlink "$dest")" = "$src" ]; then
         echo "unchanged $t: $dest"
@@ -73,6 +74,7 @@ for t in $targets; do
         continue
       fi
       action="relink"
+      was=" (was -> $(readlink "$dest"))"
     elif [ -e "$dest" ]; then
       echo "skipped $t: $dest exists and is not a symlink"
       skipped=$((skipped + 1))
@@ -80,7 +82,7 @@ for t in $targets; do
     else
       action="link"
     fi
-    echo "$action $t: $dest -> $src"
+    echo "$action $t: $dest -> $src$was"
     linked=$((linked + 1))
     if [ "$mode" = apply ]; then
       mkdir -p "$dir"

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readlinkSync, lstatSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readlinkSync, lstatSync, existsSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -45,4 +45,11 @@ test('never overwrites a folder that is not a symlink', () => {
   mkdirSync(join(home, '.agents/skills/standards'), { recursive: true });
   assert.match(install(home, '--harness', 'agents', '--apply'), /skipped agents: .* is not a symlink/);
   assert.equal(lstatSync(join(home, '.agents/skills/standards')).isSymbolicLink(), false);
+});
+
+test('a dry run shows where a symlink it would replace points now', () => {
+  const home = tempHome();
+  mkdirSync(join(home, '.agents/skills'), { recursive: true });
+  symlinkSync(join(home, 'other-standards'), join(home, '.agents/skills/standards'));
+  assert.match(install(home, '--harness', 'agents'), /^relink agents: .*\/\.agents\/skills\/standards -> .* \(was -> .*\/other-standards\)$/m);
 });
