@@ -2,8 +2,8 @@
 
 Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file is the lens a reviewer applies for that rule.
 
-- Applies to: {{ globs, each in backticks, each matching at least one tracked file }}
-- Triggers: {{ edit kinds, such as adding an endpoint or changing a schema }}
+- Applies to: {{ globs, each in backticks, each matching at least one tracked file and at most about 25% of the tracked files of its kind; or `by trigger` }}
+- Triggers: {{ edit kinds, such as adding an endpoint or changing a schema; with `by trigger`, a pattern to match against added lines, such as a call or an import }}
 - Default severity: {{ nit, minor, major or blocker }}
 
 ## Rule

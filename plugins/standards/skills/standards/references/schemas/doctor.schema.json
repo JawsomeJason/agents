@@ -44,6 +44,7 @@
           "check": {
             "enum": [
               "glob-matches-nothing",
+              "glob-too-broad",
               "cited-file-gone",
               "lens-never-fires",
               "prune-missing",
@@ -51,7 +52,7 @@
               "section-incomplete",
               "index-mismatch"
             ],
-            "description": "glob-matches-nothing: a § glob matches no tracked file. cited-file-gone: an evidence path is no longer tracked. lens-never-fires: no commit in the window triggered the lens. prune-missing: no prune.json. prune-stale: a harness's default model differs from the one recorded in prune.json. section-incomplete: a § lacks its why, 3 evidence lines, or its confirmed-when bar. index-mismatch: an index line links to a missing file, or a § file has no index line."
+            "description": "glob-matches-nothing: a § glob matches no tracked file. glob-too-broad: a § glob matches more than 25% of the tracked files of its kind. cited-file-gone: an evidence path is no longer tracked. lens-never-fires: no commit in the window triggered the lens. prune-missing: no prune.json. prune-stale: a harness's default model differs from the one recorded in prune.json. section-incomplete: a § lacks its why, 3 evidence lines, or its confirmed-when bar. index-mismatch: an index line links to a missing file, or a § file has no index line."
           },
           "section": { "type": ["string", "null"], "pattern": "^§\\d+(\\.\\d+)*$", "description": "The § the finding is about, or null for folder-wide findings." },
           "path": { "type": ["string", "null"], "description": "The glob, cited path or file the finding names." },

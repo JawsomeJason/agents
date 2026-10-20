@@ -18,9 +18,10 @@ Read each index and every § file it links. Record HEAD with `git rev-parse HEAD
 
 ## Step 2. Check globs and cited files
 
-List tracked files with `git ls-files`.
+List tracked files with `git ls-files`. A § whose Applies to line says `by trigger` has no glob, so it skips the two glob checks.
 
 - **`glob-matches-nothing`.** A glob in a § "Applies to" line matches no tracked file. Its lens can never trigger. Fix: update the glob to where the code moved, or delete the § when the code is gone.
+- **`glob-too-broad`.** A glob in a § "Applies to" line matches more than 25% of the tracked files of its kind: files with its extension, or all tracked files when it names none. Its lens triggers on almost every change. Fix: narrow the glob to where the evidence sits, or switch the § to `Applies to: by trigger` with a Triggers pattern on added lines.
 - **`cited-file-gone`.** A path in a § "Evidence" line is no longer tracked. The convention may still hold, but a reader can no longer check the evidence against the code. Fix: rerun `mine` and refresh the evidence.
 
 ## Step 3. Check which lenses fire

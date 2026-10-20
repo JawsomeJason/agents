@@ -37,3 +37,11 @@ test('the validator rejects what each schema forbids', () => {
   const labels = loadSchema('questions.labels');
   assert.deepEqual(validate(labels, [{ id: 'none', description: '' }]), ['$[0].id matches a not schema', '$[0].description is shorter than 1']);
 });
+
+test('doctor findings include a too-broad glob', () => {
+  const doctor = loadSchema('doctor');
+  const finding = { check: 'glob-too-broad', section: '§1.1', path: 'pkg/cmd/**/*.go', detail: 'Matches 672 of 900 tracked .go files.', fix: 'Narrow the glob.' };
+  const report = { standards_path: 'skills/x', checked_at: '2024-01-01T00:00:00Z', commit: 'abc1234', window: { commits: 50 }, sections: 1, findings: [finding] };
+  assert.deepEqual(validate(doctor, report), []);
+  assert.deepEqual(validate(doctor, { ...report, findings: [{ ...finding, check: 'glob-too-wide' }] }).length, 1);
+});

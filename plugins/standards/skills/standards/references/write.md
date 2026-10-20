@@ -66,7 +66,8 @@ Copy [the section template](../assets/section.template.md) to `references/s<area
 
 - **Why.** Take it from the reviewers' own reasons in the evidence, read to the end of each thread. When a thread settles on something other than what its first comment asked, write the rule the thread settled on. When no comment gives a reason and you cannot state one the evidence supports, do not write the §. List it as "no why" in the report so the user can supply one. A rule without its reason fails as soon as the code around it changes shape.
 - **Evidence.** Cite at least 3 of this rule's own comments, from its cluster or pooled from others, spanning at least 3 distinct changes and 2 distinct reviewers. Give each its change id, its path and a short excerpt. Never cite a comment that asks for a different rule from the same cluster.
-- **Applies to.** Derive globs from the cluster's paths, using their shared directories and extensions. Run `git ls-files` and keep only globs that match at least one tracked file. A glob that matches nothing never triggers its lens.
+- **Applies to.** Derive globs from the rule's evidence paths, using their shared directories and extensions. Run `git ls-files` and keep only globs that match at least one tracked file. A glob that matches nothing never triggers its lens.
+- **Glob breadth.** No glob may match more than about 25% of the repo's tracked files of its kind: files with the glob's extension, or all tracked files when it names none. Count both with `git ls-files` and a short script. A glob that broad triggers its lens on almost every change, which loads the § and invites findings on code the rule never meant. Narrow the glob to the directories the evidence sits in. When the rule truly applies everywhere its file kind appears, write `Applies to: by trigger` instead, and make the Triggers line a pattern a reviewer can match against added lines, such as a call, an import or a type, so the trigger lives in the heuristic rather than the path.
 - **Failure model.** Name each way the rule gets broken, with a default severity from the cluster's comments.
 - **Examples.** Write both examples in the repo's language, against its real types and helpers, and check that each one compiles or parses. A broken example teaches the wrong code to every agent that copies it.
 - **Heuristics.** Write patterns a reviewer can match against added lines, such as a call, an import or a missing step.
@@ -85,7 +86,7 @@ When the source repo of this skill is at hand, run its lint on the generated fol
 - Frontmatter uses only `name`, `description`, `license`, `compatibility`, `metadata` and `allowed-tools`.
 - `name` matches the folder, and the body of `SKILL.md` stays under about 5000 tokens, at 4 characters per token.
 - Every link resolves inside the skill folder, and every § file has an index line.
-- Every § has a why, at least 3 evidence lines, globs that match tracked files, and a confirmed-when bar.
+- Every § has a why, at least 3 evidence lines, globs that match tracked files and none broader than about 25% of their kind, and a confirmed-when bar.
 - No § carries a URL, a date, or a time-relative word, because each one goes stale while the rule still holds.
 
 Done when every check passes.
