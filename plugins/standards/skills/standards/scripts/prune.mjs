@@ -462,6 +462,10 @@ const jsonLines = (text) => text.split('\n').flatMap((l) => {
   }
 });
 
+// The account's synced skills and plugins, user skills and commands, and MCP servers would otherwise load into
+// every arm, the no-rule arm included. Each run records what its session reported loading, as evidence.
+export const CLAUDE_ISOLATION = ['--settings', JSON.stringify({ syncClaudeAiSkills: false, syncClaudeAiPlugins: false }), '--disable-slash-commands', '--strict-mcp-config'];
+
 /**
  * An adapter says how to run one prompt headless in a temp home, and how to read the final
  * message and the model ID out of the run. Adding a harness means adding one object here.
@@ -534,16 +538,19 @@ export const ADAPTERS = {
       }
       // The scrub keeps the token out of the commands the agent runs.
       const auth = token ? { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' } : {};
-      return { argv: ['-p', prompt, '--permission-mode', 'bypassPermissions', '--output-format', 'json', ...(model ? ['--model', model] : [])], env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg, ...auth } };
+      return {
+        argv: ['-p', prompt, ...CLAUDE_ISOLATION, '--permission-mode', 'bypassPermissions', '--output-format', 'stream-json', '--verbose', ...(model ? ['--model', model] : [])],
+        env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg, ...auth },
+      };
     },
     collect({ stdout }) {
-      let doc = null;
-      try {
-        doc = JSON.parse(stdout);
-      } catch {
-        // an unreadable reply leaves the message empty, which the runner counts as a failed attempt
-      }
-      return { message: doc?.result ?? '', model: Object.keys(doc?.modelUsage ?? {})[0] ?? null, usage: doc?.usage ?? null };
+      const events = jsonLines(stdout);
+      const init = events.find((e) => e.type === 'system' && e.subtype === 'init');
+      const doc = events.findLast((e) => e.type === 'result');
+      const names = (list) => (Array.isArray(list) ? list.map((x) => (typeof x === 'string' ? x : x?.name ?? JSON.stringify(x))) : null);
+      const loaded = init ? { skills: names(init.skills), plugins: names(init.plugins), mcp_servers: names(init.mcp_servers) } : null;
+      // an unreadable reply leaves the message empty, which the runner counts as a failed attempt
+      return { message: doc?.result ?? '', model: Object.keys(doc?.modelUsage ?? {})[0] ?? null, usage: doc?.usage ?? null, loaded };
     },
   },
 };
@@ -691,6 +698,7 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
       files_changed: files,
       diff_bytes: diff.length,
       usage: got.usage ?? null,
+      loaded: got.loaded ?? null,
     };
     writeAtomic(join(dest, 'run.json'), `${JSON.stringify(record, null, 2)}\n`);
     return { record };

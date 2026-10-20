@@ -602,3 +602,35 @@ test('an agent gets only the allowlisted environment, never the caller\'s tokens
     for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
 });
+
+test('the claude adapter turns off account skills, plugins, commands and tool servers, and reads what its session loaded', () => {
+  const dir = tempDir();
+  const saved = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  process.env.CLAUDE_CODE_OAUTH_TOKEN = 'tok-FAKE';
+  try {
+    const { argv } = prune.ADAPTERS.claude.prepare({ tmp: dir, scratch: dir, prompt: 'P', model: null });
+    const settings = JSON.parse(argv[argv.indexOf('--settings') + 1]);
+    assert.deepEqual(settings, { syncClaudeAiSkills: false, syncClaudeAiPlugins: false });
+    for (const flag of ['--disable-slash-commands', '--strict-mcp-config']) assert.ok(argv.includes(flag), flag);
+  } finally {
+    if (saved === undefined) delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    else process.env.CLAUDE_CODE_OAUTH_TOKEN = saved;
+  }
+  const stdout = [
+    { type: 'system', subtype: 'init', skills: ['debug'], plugins: [{ name: 'p1', path: '/x' }], mcp_servers: [] },
+    { type: 'assistant', message: {} },
+    { type: 'result', result: 'all done', modelUsage: { 'model-a': {} }, usage: { input_tokens: 3 } },
+  ].map((e) => JSON.stringify(e)).join('\n');
+  assert.deepEqual(prune.ADAPTERS.claude.collect({ stdout }), {
+    message: 'all done', model: 'model-a', usage: { input_tokens: 3 }, loaded: { skills: ['debug'], plugins: ['p1'], mcp_servers: [] },
+  });
+});
+
+test('a run records what its session reported loading', async () => {
+  const fx = fixture();
+  const adapter = { ...fakeAdapter(), collect: () => ({ message: 'done', model: 'm', usage: null, loaded: { skills: [], plugins: [], mcp_servers: [] } }) };
+  const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a'], log: () => {} }, { fake: adapter });
+  const { record } = await trial(ctx, '§1.1', 'fake');
+  assert.deepEqual(record.loaded, { skills: [], plugins: [], mcp_servers: [] });
+  assert.deepEqual(validate(loadSchema('prune.run'), record), []);
+});
