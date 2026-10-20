@@ -1121,6 +1121,13 @@ export async function trial(ctx, section, harnessName) {
   }
   ctx.log(`trial ${section} ${harnessName}: ${r.record.files_changed.length} files changed: ${r.record.files_changed.join(', ')}`);
   ctx.log(`diff at ${join(dest, 'diff.patch')}`);
+  const loaded = r.record.loaded;
+  const list = (xs) => (xs?.length ? xs.join(', ') : 'none');
+  if (!loaded) ctx.log('loaded: not reported by this harness; isolation rests on the fresh home alone');
+  else {
+    ctx.log(`loaded: skills ${list(loaded.skills)}; plugins ${list(loaded.plugins)}; mcp servers ${list(loaded.mcp_servers)}`);
+    if (loaded.skills?.length) ctx.log('warning: the session loaded skills, so the no-rule arm may not be clean');
+  }
   return { record: r.record, dest };
 }
 

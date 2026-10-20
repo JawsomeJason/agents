@@ -879,3 +879,19 @@ test('editing a rule\'s index one-liner asks a new grading question', () => {
   const rule = { section: '§1.1', text: 'Body.', rule: 'Name values.' };
   assert.notEqual(prune.questionId(run, rule, 'P'), prune.questionId(run, { ...rule, rule: 'Never name values.' }, 'P'));
 });
+
+test('trial prints what the session loaded and warns when skills loaded', async () => {
+  const fx = fixture();
+  const init = JSON.stringify({ type: 'system', subtype: 'init', skills: ['someone-else'], plugins: [], mcp_servers: [] });
+  const result = JSON.stringify({ type: 'result', result: 'done', modelUsage: { m: {} } });
+  const agent = {
+    command: 'sh',
+    auth: () => null,
+    prepare: ({ wt }) => ({ argv: ['-c', `printf '%s\\n' '${init}' '${result}'; echo x >> ${wt}/main.txt`], env: {} }),
+    collect: prune.ADAPTERS.claude.collect,
+  };
+  const logs = [];
+  const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['c'], graders: ['a'], log: (s) => logs.push(s) }, { c: agent });
+  await trial(ctx, '§1.1', 'c');
+  assert.deepEqual(logs.filter((l) => /^(loaded|warning):/.test(l)), ['loaded: skills someone-else; plugins none; mcp servers none', 'warning: the session loaded skills, so the no-rule arm may not be clean']);
+});
