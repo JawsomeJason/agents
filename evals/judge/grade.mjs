@@ -20,6 +20,8 @@ const HUNK_TAIL = 1500;
 
 const normPath = (p) => (p ?? '').replace(/^(?:\.\/|[ab]\/)/, '');
 const yes = (a) => (typeof a.distribution?.true === 'number' ? a.distribution.true : a.answer === true ? a.confidence : 1 - a.confidence);
+// At an even split the answerer's own verdict decides, so an agent's false at 0.5 stays false.
+const says = (a, threshold = 0.5) => (yes(a) === threshold ? a.answer === true : yes(a) > threshold);
 
 function collect(data) {
   const manifest = readJson(join(data, 'review', 'manifest.json'));
@@ -107,8 +109,8 @@ function calibrate(data, answersFile, n, seed) {
   const rows = readJsonl(join(data, 'grade', 'pairs.questions.jsonl'));
   const answers = readAnswers(answersFile);
   if (!existsSync(file)) {
-    const pos = seededShuffle(rows.filter((r) => yes(answers.get(r.id)) >= 0.5), seed);
-    const neg = seededShuffle(rows.filter((r) => yes(answers.get(r.id)) < 0.5), seed + 1);
+    const pos = seededShuffle(rows.filter((r) => says(answers.get(r.id))), seed);
+    const neg = seededShuffle(rows.filter((r) => !says(answers.get(r.id))), seed + 1);
     const take = Math.min(Math.ceil(n / 2), pos.length);
     const sample = seededShuffle([...pos.slice(0, take), ...neg.slice(0, n - take)], seed + 2);
     writeJson(file, sample.map((r) => ({ id: r.id, ...JSON.parse(r.state), same_concern: null })));
@@ -118,12 +120,12 @@ function calibrate(data, answersFile, n, seed) {
   const labeled = readJson(file);
   const open = labeled.filter((l) => typeof l.same_concern !== 'boolean');
   if (open.length) throw new JudgeError(`${open.length} pairs in ${file} still need a same_concern label`);
-  const agreed = labeled.filter((l) => (yes(answers.get(l.id)) >= 0.5) === l.same_concern).length;
+  const agreed = labeled.filter((l) => says(answers.get(l.id)) === l.same_concern).length;
   const result = { labeled: labeled.length, agreed, agreement: agreed / labeled.length, passed: agreed / labeled.length >= 0.9 };
   writeJson(join(data, 'grade', 'calibration.result.json'), {
     ...result,
     answers: answersFile,
-    disagreements: labeled.filter((l) => (yes(answers.get(l.id)) >= 0.5) !== l.same_concern).map((l) => ({ id: l.id, hand: l.same_concern, grader_yes: yes(answers.get(l.id)) })),
+    disagreements: labeled.filter((l) => says(answers.get(l.id)) !== l.same_concern).map((l) => ({ id: l.id, hand: l.same_concern, grader_yes: yes(answers.get(l.id)) })),
   });
   console.log(JSON.stringify(result));
 }
@@ -135,7 +137,7 @@ function conventionFlags(data) {
     const conv = answers.get(`${id}#convention`);
     const label = answers.get(`${id}#label`);
     if (!conv || !label) throw new JudgeError(`held-out comment ${id} has no convention or label answer`);
-    return { convention: yes(conv) >= 0.5 && label.answer !== 'none', label: label.answer };
+    return { convention: says(conv) && label.answer !== 'none', label: label.answer };
   };
 }
 
@@ -151,7 +153,7 @@ function score(data, answersFile, threshold) {
   const table = {};
   const perChange = {};
   for (const arm of ARMS) {
-    const matches = rows.filter((p) => p.arm === arm && yes(answers.get(p.id) ?? missingAnswer(p.id)) >= threshold);
+    const matches = rows.filter((p) => p.arm === arm && says(answers.get(p.id) ?? missingAnswer(p.id), threshold));
     const caught = new Set(matches.map((p) => p.comment));
     const backed = new Set(matches.map((p) => `${p.change}/${p.finding}`));
     const all = split.heldout.flatMap((c) => findings[arm][c.number].map((f, i) => ({ change: c.number, i, f })));
