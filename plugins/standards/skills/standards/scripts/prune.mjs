@@ -908,8 +908,8 @@ export function plan(ctx) {
   const perRule = 2 * BATCH + 2 * BATCH; // none 10, one-liner 5, full 5
   const most = ctx.rules.length * ctx.active.length * perRule;
   ctx.log(`${ctx.rules.length} rules, ${ctx.active.length} harnesses: ${harnessNote}`);
-  ctx.log(`most runs: ${most} (${perRule} per rule per harness: none 10, one-liner 5, full 5). Fewest: ${ctx.rules.length * ctx.active.length * BATCH}.`);
-  return { rules: ctx.rules.length, harnesses: ctx.active.length, most };
+  ctx.log(`most runs: ${most} (${perRule} per rule per harness: none 10, one-liner 5, full 5). Fewest: ${ctx.rules.length * ctx.active.length * 2 * BATCH} (none 10, or none 5 and one-liner 5).`);
+  return { rules: ctx.rules.length, harnesses: ctx.active.length, most, fewest: ctx.rules.length * ctx.active.length * 2 * BATCH };
 }
 
 /**

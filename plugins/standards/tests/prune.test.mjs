@@ -203,6 +203,13 @@ test('a numeric option that is not a whole number is a usage error, not a silent
   assert.equal(context(fx, 'rule', { 'backoff-sec': '0' }).backoffMs, 0);
 });
 
+test('plan prints the fewest runs any path through the sampling takes', () => {
+  const fx = fixture();
+  const ctx = context(fx);
+  assert.deepEqual(prune.plan(ctx), { rules: 2, harnesses: 1, most: 40, fewest: 20 });
+  assert.match(ctx.logs[1], /Fewest: 20 \(none 10, or none 5 and one-liner 5\)\./);
+});
+
 test('a probe set must cover every rule', () => {
   const fx = fixture();
   writeFileSync(fx.probes, JSON.stringify([{ section: '§1.1', probe: 'Add a greeting.' }]));
