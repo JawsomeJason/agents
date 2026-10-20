@@ -54,4 +54,4 @@ main((argv) => {
   const orphans = all.filter((f) => !placed.has(f));
   if (orphans.length) throw new JudgeError(`shape A files with no index line: ${orphans.join(', ')}`);
   console.log(`${index.areas.length} skills, ${placed.size} § files, written to ${out}`);
-});
+}, import.meta.url);

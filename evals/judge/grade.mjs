@@ -212,4 +212,4 @@ main((argv) => {
   if (command === 'calibrate') return calibrate(data, answersFile, Number(values.n), Number(values.seed));
   if (command === 'score') return score(data, answersFile, Number(values.threshold));
   throw new JudgeError(USAGE);
-});
+}, import.meta.url);
