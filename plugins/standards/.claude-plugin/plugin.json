@@ -1,6 +1,6 @@
 {
   "name": "standards",
-  "description": "Mine a repo's review history into coding standards and the lenses that review against them",
+  "description": "Mines a repo's review history into coding standards that agents follow while they write code, and prunes the rules agents already follow.",
   "version": "0.1.0",
   "author": {
     "name": "Jason Featheringham",
