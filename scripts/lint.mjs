@@ -66,12 +66,14 @@ function parseFrontmatter(text) {
     if (top) {
       const [, key, rest] = top;
       const block = /^\s*[>|][+-]?\s*$/.test(rest);
-      current = { key, line: i + 1, value: block || rest.trim() === '' ? '' : parseScalar(rest), block };
+      // A scalar on the key's line may continue on indented lines, which YAML folds into one string.
+      current = { key, line: i + 1, value: block ? '' : rest.trim(), block, scalar: !block && rest.trim() !== '' };
       fields.set(key, current);
-    } else if (current?.block && line.trim() !== '') {
+    } else if ((current?.block || (current?.scalar && /^\s/.test(line))) && line.trim() !== '') {
       current.value += (current.value ? ' ' : '') + line.trim();
     }
   }
+  for (const f of fields.values()) if (f.scalar) f.value = parseScalar(f.value);
   return { fields, bodyStartLine: end + 2, body: lines.slice(end + 1).join('\n') };
 }
 

@@ -12,6 +12,7 @@ const expected = {
   'body-tokens': 'body-tokens',
   'compatibility-length': 'compatibility-length',
   'description-length': 'description-length',
+  'description-length-multiline': 'description-length',
   'description-missing': 'description-missing',
   'doc-scope': 'time-word',
   'fence-length': 'fence-length',
