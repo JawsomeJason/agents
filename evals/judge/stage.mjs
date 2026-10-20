@@ -6,10 +6,10 @@
 import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { ARMS, SKILL_DIR, args, main, need, readJson, run, writeAtomic, writeJson } from './lib.mjs';
+import { ARMS, JudgeError, SKILL_DIR, args, main, need, readJson, run, writeAtomic, writeJson } from './lib.mjs';
 
 const USAGE =
-  'usage: stage.mjs --repo <owner/name> --clone <dir> --data <dir> --workspace <dir> --standards-a <dir> --standards-b <dir> [--repo-name <text>]';
+  'usage: stage.mjs --repo <owner/name> --clone <dir> --data <dir> --workspace <dir> [--arms none,A,B] [--standards-a <dir>] [--standards-b <dir>] [--repo-name <text>]';
 
 const DIFF_BUDGET = 150000;
 const LOCKFILE = /(?:^|\/)(?:package-lock\.json|go\.sum|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock)$/;
@@ -92,16 +92,20 @@ function stage(argv) {
       'standards-a': { type: 'string' },
       'standards-b': { type: 'string' },
       'repo-name': { type: 'string' },
+      arms: { type: 'string', default: ARMS.join(',') },
     },
     USAGE,
   );
-  need(values, ['repo', 'clone', 'data', 'workspace', 'standards-a', 'standards-b'], USAGE);
+  const arms = values.arms.split(',').filter(Boolean);
+  const unknown = arms.filter((a) => !ARMS.includes(a));
+  if (unknown.length) throw new JudgeError(`unknown arm ${unknown.join(', ')}; arms are ${ARMS.join(', ')}\n${USAGE}`);
+  need(values, ['repo', 'clone', 'data', 'workspace', ...arms.filter((a) => a !== 'none').map((a) => `standards-${a.toLowerCase()}`)], USAGE);
   const { repo, data } = values;
   const clone = resolve(values.clone);
   const workspace = resolve(values.workspace);
   const repoName = values['repo-name'] ?? repo;
   const split = readJson(join(data, 'split.json'));
-  const standards = { A: resolve(values['standards-a']), B: resolve(values['standards-b']) };
+  const standards = Object.fromEntries(arms.filter((a) => a !== 'none').map((a) => [a, resolve(values[`standards-${a.toLowerCase()}`])]));
   const manifest = {};
   let missingSource = 0;
 
@@ -112,7 +116,7 @@ function stage(argv) {
     writeAtomic(diff, trimmed.text);
     const source = ensureCommit(clone, change);
     if (!source) missingSource++;
-    for (const arm of ARMS) {
+    for (const arm of arms) {
       const id = token(repo, change.number, arm);
       const dir = join(workspace, `cr-${id}`);
       // Rebuilt from scratch every run, so a stale copy of older standards never survives.
