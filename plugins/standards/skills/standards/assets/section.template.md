@@ -8,7 +8,7 @@ Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file is the l
 
 ## Rule
 
-{{ The index line for §id, word for word. }}
+{{ The rule sentence of the index line for §id, word for word, without its severity or link. }}
 
 ## Why
 

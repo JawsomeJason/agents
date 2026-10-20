@@ -34,7 +34,7 @@ When there are none, ask the user for the path of their standards. When they hav
 2. For each § in the index, open its file and read its "Applies to" globs and its "Triggers" line.
 3. A § triggers when a changed path matches one of its globs and the change is an edit kind its Triggers line names. A § whose Applies to line says `by trigger` triggers when the added lines of any changed file match the pattern its Triggers line names.
 
-Load only the triggered § files. Every extra § costs context and invites findings about code the diff never touched.
+Note each triggered §'s default severity from its index line. Load only the triggered § files. Every extra § costs context and invites findings about code the diff never touched.
 
 ## Step 4. Apply each lens
 

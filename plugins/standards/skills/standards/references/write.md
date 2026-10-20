@@ -87,7 +87,7 @@ Copy [the section template](../assets/section.template.md) to `references/s<area
 
 ## Step 6. Write the index
 
-Copy [the index template](../assets/index.template.md) to the skill folder as `SKILL.md`. List every § as its one-liner with a link to its file, and keep the `metadata` block so `review` and `doctor` can find this skill.
+Copy [the index template](../assets/index.template.md) to the skill folder as `SKILL.md`. List every § as its one-liner, then its default severity in parentheses, such as `(nit)`, then a link to its file, and keep the `metadata` block so `review` and `doctor` can find this skill. The severity is the § file's Default severity line. It sits in the index because a reviewer reads the index first, and a rule it knows is a nit is one it reports instead of holding back.
 
 Fill `description` with the file kinds and edit kinds the globs cover, at most 1024 characters. The description decides when an agent loads the standards, so each area's edit kind belongs in it.
 
