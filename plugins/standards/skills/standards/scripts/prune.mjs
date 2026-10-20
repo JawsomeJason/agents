@@ -474,7 +474,8 @@ export function privateDir(parent, prefix = 'standards-prune-') {
 // ---------------------------------------------------------------------------------------------
 // Harness adapters
 
-const PASS_ENV = /^(?:PATH|HOME|LANG|LC_\w+|TERM|TMPDIR|USER|SHELL)$/;
+// Locale, shell and path basics, plus the proxy and CA settings a corporate network needs to reach any provider.
+const PASS_ENV = /^(?:PATH|HOME|LANG|LC_(?:ALL|COLLATE|CTYPE|MESSAGES|MONETARY|NUMERIC|TIME)|TERM|TMPDIR|USER|LOGNAME|SHELL|(?:HTTP|HTTPS|ALL|NO)_PROXY|(?:http|https|all|no)_proxy|NODE_EXTRA_CA_CERTS|SSL_CERT_FILE|SSL_CERT_DIR)$/;
 
 /**
  * An agent's environment: the caller's locale, shell and path basics, plus what the adapter adds for its own

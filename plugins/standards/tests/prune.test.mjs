@@ -861,3 +861,15 @@ test('a repo path holding a percent sign clones for the runs', async () => {
   const r = await trial(context({ ...fx, repo: odd }, 'rule'), '§1.1', 'fake');
   assert.ok(r.record, r.failed);
 });
+
+test('an agent environment keeps locale, proxy and CA settings and drops everything else', () => {
+  const planted = { LC_ALL: 'C', LC_CTYPE: 'C', LC_SECRET: 'x', LOGNAME: 'me', HTTPS_PROXY: 'http://p', no_proxy: 'local', NODE_EXTRA_CA_CERTS: '/ca.pem', SSL_CERT_FILE: '/c.pem', GH_TOKEN: 'ghp_FAKE' };
+  const saved = Object.fromEntries(Object.keys(planted).map((k) => [k, process.env[k]]));
+  Object.assign(process.env, planted);
+  try {
+    const env = prune.harnessEnv({});
+    assert.deepEqual(Object.fromEntries(Object.keys(planted).map((k) => [k, env[k]])), { ...planted, LC_SECRET: undefined, GH_TOKEN: undefined });
+  } finally {
+    for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  }
+});
