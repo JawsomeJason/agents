@@ -7,7 +7,7 @@ import { failed, fakeRunner, gitRepo, readJsonl, runNode, tempDir } from './help
 import { loadSchema, validate } from './schema.mjs';
 
 const GH = JSON.parse(readFileSync(new URL('./fixtures/gh-api.json', import.meta.url), 'utf8'));
-const REMOTE = 'https://github.com/tj/commander.js.git';
+const REMOTE = 'https://github.com/example-org/example-repo.git';
 const schema = loadSchema('fetch-reviews.reviews');
 
 const assertValid = (records) => {
@@ -18,7 +18,7 @@ const fetchGh = (cwd, out, extra = {}) =>
   fetchReviews({ cwd, out, limit: 3, perPage: 2, run: fakeRunner({ responses: GH, cli: { gh: 'ok' } }), ...extra });
 
 test('parses scp, https and ssh remotes, and rejects local paths', () => {
-  assert.deepEqual(parseRemote('git@github.com:tj/commander.js.git'), { host: 'github.com', path: 'tj/commander.js' });
+  assert.deepEqual(parseRemote('git@github.com:example-org/example-repo.git'), { host: 'github.com', path: 'example-org/example-repo' });
   assert.deepEqual(parseRemote('https://gitlab.example.com/group/sub/proj.git\n'), { host: 'gitlab.example.com', path: 'group/sub/proj' });
   assert.deepEqual(parseRemote('ssh://git@host.example:2222/o/r'), { host: 'host.example', path: 'o/r' });
   assert.equal(parseRemote('/srv/repos/r.git'), null);
@@ -47,7 +47,7 @@ test('gh: pages through merged pull requests and maps every comment kind', () =>
 
 test('gh: records the commit and line the reviewer saw, not where a later push moved them', () => {
   const responses = structuredClone(GH);
-  const page = responses['repos/tj/commander.js/pulls/2646/comments?per_page=2&page=1'];
+  const page = responses['repos/example-org/example-repo/pulls/2646/comments?per_page=2&page=1'];
   Object.assign(page[0], { line: null, original_line: 15, commit_id: 'bbbbbbb', original_commit_id: 'aaaaaaa' });
   const out = join(tempDir(), 'reviews.jsonl');
   fetchReviews({ cwd: repo(), out, limit: 3, perPage: 2, run: fakeRunner({ responses, cli: { gh: 'ok' } }) });
@@ -57,12 +57,12 @@ test('gh: records the commit and line the reviewer saw, not where a later push m
 
 test('gh: records the change author on every comment', () => {
   const responses = structuredClone(GH);
-  responses['repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=6'][1].user = { login: 'shadowspawn' };
+  responses['repos/example-org/example-repo/pulls?state=closed&sort=created&direction=desc&per_page=2&page=6'][1].user = { login: 'maintainer-two' };
   const out = join(tempDir(), 'reviews.jsonl');
   fetchReviews({ cwd: repo(), out, limit: 3, perPage: 2, run: fakeRunner({ responses, cli: { gh: 'ok' } }) });
   const records = readJsonl(out);
   assertValid(records);
-  assert.deepEqual([...new Set(records.map((x) => x.change_author))], ['shadowspawn']);
+  assert.deepEqual([...new Set(records.map((x) => x.change_author))], ['maintainer-two']);
 });
 
 test('gh: --limit stops at that many merged changes', () => {
@@ -74,7 +74,7 @@ test('gh: --limit stops at that many merged changes', () => {
 
 test('gh: marks bot accounts', () => {
   const responses = structuredClone(GH);
-  const page = responses['repos/tj/commander.js/pulls/2646/comments?per_page=2&page=1'];
+  const page = responses['repos/example-org/example-repo/pulls/2646/comments?per_page=2&page=1'];
   page[0].user = { login: 'renovate[bot]', type: 'Bot' };
   const out = join(tempDir(), 'reviews.jsonl');
   fetchReviews({ cwd: repo(), out, limit: 3, perPage: 2, run: fakeRunner({ responses, cli: { gh: 'ok' } }) });
@@ -110,7 +110,7 @@ test('gh: a run that fails partway resumes to the same output', () => {
   });
   assert.throws(() => fetchReviews({ cwd, out, limit: 3, perPage: 2, run: flaky }), FetchError);
   assert.equal(existsSync(out), false);
-  const cacheDir = join(`${out}.cache`, 'gh-github.com-tj_commander.js');
+  const cacheDir = join(`${out}.cache`, 'gh-github.com-example-org_example-repo');
   assert.deepEqual(readdirSync(cacheDir).sort(), ['2653.json', '2654.json']);
 
   fetchGh(cwd, out);
@@ -121,7 +121,7 @@ test('detection: missing, signed-out and wrong-remote CLIs all fall back to git 
   const cases = [
     [{}, ['gh is not installed', 'glab is not installed']],
     [{ gh: 'signed-out' }, ['gh is not signed in to github.com', 'glab is not installed']],
-    [{ gh: 'ok', glab: 'ok' }, ['gh cannot find tj/commander.js on github.com', 'glab cannot find tj/commander.js on github.com']],
+    [{ gh: 'ok', glab: 'ok' }, ['gh cannot find example-org/example-repo on github.com', 'glab cannot find example-org/example-repo on github.com']],
   ];
   for (const [cli, reasons] of cases) {
     const r = fetchReviews({ cwd: repo(), out: join(tempDir(), 'r.jsonl'), run: fakeRunner({ cli }) });

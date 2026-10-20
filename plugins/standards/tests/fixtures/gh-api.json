@@ -1,8 +1,8 @@
 {
-  "repos/tj/commander.js": {
-    "full_name": "tj/commander.js"
+  "repos/example-org/example-repo": {
+    "full_name": "example-org/example-repo"
   },
-  "repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=1": [
+  "repos/example-org/example-repo/pulls?state=closed&sort=created&direction=desc&per_page=2&page=1": [
     {
       "number": 2658,
       "merged_at": null
@@ -12,7 +12,7 @@
       "merged_at": null
     }
   ],
-  "repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=2": [
+  "repos/example-org/example-repo/pulls?state=closed&sort=created&direction=desc&per_page=2&page=2": [
     {
       "number": 2656,
       "merged_at": null
@@ -22,7 +22,7 @@
       "merged_at": null
     }
   ],
-  "repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=3": [
+  "repos/example-org/example-repo/pulls?state=closed&sort=created&direction=desc&per_page=2&page=3": [
     {
       "number": 2654,
       "merged_at": "2026-10-17T01:41:59Z"
@@ -32,7 +32,7 @@
       "merged_at": "2026-10-19T21:30:54Z"
     }
   ],
-  "repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=4": [
+  "repos/example-org/example-repo/pulls?state=closed&sort=created&direction=desc&per_page=2&page=4": [
     {
       "number": 2652,
       "merged_at": null
@@ -42,7 +42,7 @@
       "merged_at": null
     }
   ],
-  "repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=5": [
+  "repos/example-org/example-repo/pulls?state=closed&sort=created&direction=desc&per_page=2&page=5": [
     {
       "number": 2649,
       "merged_at": null
@@ -52,7 +52,7 @@
       "merged_at": null
     }
   ],
-  "repos/tj/commander.js/pulls?state=closed&sort=created&direction=desc&per_page=2&page=6": [
+  "repos/example-org/example-repo/pulls?state=closed&sort=created&direction=desc&per_page=2&page=6": [
     {
       "number": 2647,
       "merged_at": null
@@ -62,164 +62,164 @@
       "merged_at": "2026-10-09T02:18:01Z"
     }
   ],
-  "repos/tj/commander.js/pulls/2654/comments?per_page=2&page=1": [],
-  "repos/tj/commander.js/pulls/2654/reviews?per_page=2&page=1": [
+  "repos/example-org/example-repo/pulls/2654/comments?per_page=2&page=1": [],
+  "repos/example-org/example-repo/pulls/2654/reviews?per_page=2&page=1": [
     {
       "id": 5555395082,
       "user": {
-        "login": "abetomo",
+        "login": "reviewer-one",
         "type": "User"
       },
       "body": "",
       "state": "APPROVED",
       "submitted_at": "2026-10-17T01:38:57Z",
       "commit_id": "66242bc062da1dc875d784fb830d9faa175d7800",
-      "html_url": "https://github.com/tj/commander.js/pull/2654#pullrequestreview-5555395082"
+      "html_url": "https://github.com/example-org/example-repo/pull/2654#pullrequestreview-5555395082"
     }
   ],
-  "repos/tj/commander.js/pulls/2653/comments?per_page=2&page=1": [],
-  "repos/tj/commander.js/pulls/2653/reviews?per_page=2&page=1": [
+  "repos/example-org/example-repo/pulls/2653/comments?per_page=2&page=1": [],
+  "repos/example-org/example-repo/pulls/2653/reviews?per_page=2&page=1": [
     {
       "id": 5571389442,
       "user": {
-        "login": "abetomo",
+        "login": "reviewer-one",
         "type": "User"
       },
       "body": "",
       "state": "APPROVED",
       "submitted_at": "2026-10-19T12:16:09Z",
       "commit_id": "8ae2a29e2b39bfb5cd7def1850200712575a2417",
-      "html_url": "https://github.com/tj/commander.js/pull/2653#pullrequestreview-5571389442"
+      "html_url": "https://github.com/example-org/example-repo/pull/2653#pullrequestreview-5571389442"
     }
   ],
-  "repos/tj/commander.js/pulls/2646/comments?per_page=2&page=1": [
+  "repos/example-org/example-repo/pulls/2646/comments?per_page=2&page=1": [
     {
       "id": 4225762243,
       "user": {
-        "login": "abetomo",
+        "login": "reviewer-one",
         "type": "User"
       },
-      "body": " It might be better to add a line like \"Please open an issue first\".",
+      "body": " Consider adding a line that tells contributors to open an issue first.",
       "path": "CONTRIBUTING.md",
       "line": 18,
       "diff_hunk": "@@ -12,7 +12,14 @@ or after six months otherwise.\n \n ## Pull Requests\n \n-Pull Requests will be considered. Please submit pull requests against the develop branch.\n+To limit the number of open Pull Requests so maintainers are not overwhelmed:\n+\n+- Don't open a Pull Request unless invited to do so by a maintainer.",
       "commit_id": "1efd21ffcf6bced13daf09ff1abdc0c803f69e48",
       "created_at": "2026-10-09T01:24:34Z",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#discussion_r4225762243"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#discussion_r4225762243"
     },
     {
       "id": 4225818482,
       "user": {
-        "login": "shadowspawn",
+        "login": "maintainer-two",
         "type": "User"
       },
-      "body": "Do you mean in addition to the \"unless invited\", or instead of?\r\n\r\nThe reason I added the \"unless invited\" item is I have already had cases where AI opens both an Issue and a Pull request at the same time. I didn't want to encourage more of that.\r\n\r\nHowever, implicitly users should open an issue first. Happy to make it explicit by adding that line?",
+      "body": "As well as the invite rule, or in place of it?\r\n\r\nThe invite rule is there because some contributors open an issue and a pull request together, and that doubles the triage.\r\n\r\nOpening an issue first is implied already. Should the line say it outright?",
       "path": "CONTRIBUTING.md",
       "line": 18,
       "diff_hunk": "@@ -12,7 +12,14 @@ or after six months otherwise.\n \n ## Pull Requests\n \n-Pull Requests will be considered. Please submit pull requests against the develop branch.\n+To limit the number of open Pull Requests so maintainers are not overwhelmed:\n+\n+- Don't open a Pull Request unless invited to do so by a maintainer.",
       "commit_id": "1efd21ffcf6bced13daf09ff1abdc0c803f69e48",
       "in_reply_to_id": 4225762243,
       "created_at": "2026-10-09T01:36:45Z",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#discussion_r4225818482"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#discussion_r4225818482"
     }
   ],
-  "repos/tj/commander.js/pulls/2646/comments?per_page=2&page=2": [
+  "repos/example-org/example-repo/pulls/2646/comments?per_page=2&page=2": [
     {
       "id": 4225843246,
       "user": {
-        "login": "abetomo",
+        "login": "reviewer-one",
         "type": "User"
       },
-      "body": "In addition to.\nSince this file is mainly for humans, a line like \"Please open an issue first rather than starting with a pull request\" would give them a clear next step, instead of only saying what not to do. So yes, adding that line sounds good!",
+      "body": "As well as.\nPeople read this file, so a line such as \"Open an issue before a pull request\" gives them a next step, not only a prohibition. Yes, please add it.",
       "path": "CONTRIBUTING.md",
       "line": 18,
       "diff_hunk": "@@ -12,7 +12,14 @@ or after six months otherwise.\n \n ## Pull Requests\n \n-Pull Requests will be considered. Please submit pull requests against the develop branch.\n+To limit the number of open Pull Requests so maintainers are not overwhelmed:\n+\n+- Don't open a Pull Request unless invited to do so by a maintainer.",
       "commit_id": "1efd21ffcf6bced13daf09ff1abdc0c803f69e48",
       "in_reply_to_id": 4225762243,
       "created_at": "2026-10-09T01:42:18Z",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#discussion_r4225843246"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#discussion_r4225843246"
     },
     {
       "id": 4225965322,
       "user": {
-        "login": "shadowspawn",
+        "login": "maintainer-two",
         "type": "User"
       },
-      "body": "👍 \r\n\r\nAdded:\r\n\r\n- If there is not already an issue, please open an issue first rather than starting with a pull request.",
+      "body": "👍 \r\n\r\nAdded:\r\n\r\n- Open an issue before a pull request when none exists yet.",
       "path": "CONTRIBUTING.md",
       "line": 18,
       "diff_hunk": "@@ -12,7 +12,14 @@ or after six months otherwise.\n \n ## Pull Requests\n \n-Pull Requests will be considered. Please submit pull requests against the develop branch.\n+To limit the number of open Pull Requests so maintainers are not overwhelmed:\n+\n+- Don't open a Pull Request unless invited to do so by a maintainer.",
       "commit_id": "1efd21ffcf6bced13daf09ff1abdc0c803f69e48",
       "in_reply_to_id": 4225762243,
       "created_at": "2026-10-09T02:09:31Z",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#discussion_r4225965322"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#discussion_r4225965322"
     }
   ],
-  "repos/tj/commander.js/pulls/2646/comments?per_page=2&page=3": [],
-  "repos/tj/commander.js/pulls/2646/reviews?per_page=2&page=1": [
+  "repos/example-org/example-repo/pulls/2646/comments?per_page=2&page=3": [],
+  "repos/example-org/example-repo/pulls/2646/reviews?per_page=2&page=1": [
     {
       "id": 5464712846,
       "user": {
-        "login": "abetomo",
+        "login": "reviewer-one",
         "type": "User"
       },
       "body": "",
       "state": "COMMENTED",
       "submitted_at": "2026-10-09T01:24:34Z",
       "commit_id": "f05eab1d32f3ad0e62da2de31fcdf6d64e5b5c0b",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#pullrequestreview-5464712846"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#pullrequestreview-5464712846"
     },
     {
       "id": 5464772594,
       "user": {
-        "login": "shadowspawn",
+        "login": "maintainer-two",
         "type": "User"
       },
       "body": "",
       "state": "COMMENTED",
       "submitted_at": "2026-10-09T01:36:45Z",
       "commit_id": "f05eab1d32f3ad0e62da2de31fcdf6d64e5b5c0b",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#pullrequestreview-5464772594"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#pullrequestreview-5464772594"
     }
   ],
-  "repos/tj/commander.js/pulls/2646/reviews?per_page=2&page=2": [
+  "repos/example-org/example-repo/pulls/2646/reviews?per_page=2&page=2": [
     {
       "id": 5464799292,
       "user": {
-        "login": "abetomo",
+        "login": "reviewer-one",
         "type": "User"
       },
       "body": "",
       "state": "COMMENTED",
       "submitted_at": "2026-10-09T01:42:19Z",
       "commit_id": "f05eab1d32f3ad0e62da2de31fcdf6d64e5b5c0b",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#pullrequestreview-5464799292"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#pullrequestreview-5464799292"
     },
     {
       "id": 5464932290,
       "user": {
-        "login": "shadowspawn",
+        "login": "maintainer-two",
         "type": "User"
       },
       "body": "",
       "state": "COMMENTED",
       "submitted_at": "2026-10-09T02:09:32Z",
       "commit_id": "f05eab1d32f3ad0e62da2de31fcdf6d64e5b5c0b",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#pullrequestreview-5464932290"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#pullrequestreview-5464932290"
     }
   ],
-  "repos/tj/commander.js/pulls/2646/reviews?per_page=2&page=3": [
+  "repos/example-org/example-repo/pulls/2646/reviews?per_page=2&page=3": [
     {
       "id": 5464951591,
       "user": {
-        "login": "abetomo",
+        "login": "reviewer-one",
         "type": "User"
       },
       "body": "👍 ",
       "state": "APPROVED",
       "submitted_at": "2026-10-09T02:13:32Z",
       "commit_id": "1efd21ffcf6bced13daf09ff1abdc0c803f69e48",
-      "html_url": "https://github.com/tj/commander.js/pull/2646#pullrequestreview-5464951591"
+      "html_url": "https://github.com/example-org/example-repo/pull/2646#pullrequestreview-5464951591"
     }
   ]
 }
