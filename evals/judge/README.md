@@ -26,7 +26,7 @@ Run from anywhere. `$D` is the data folder for one repo and `$S` is `plugins/sta
 
 ## Lens pass
 
-`lens.mjs` tests whether a reviewer misses rules because it forgets to apply them. It asks one yes/no question for every pair of a § in a standards skill and an added hunk in a file that §'s Applies-to globs match, so every rule meets every hunk it covers.
+`lens.mjs` tests whether a reviewer misses rules because it forgets to apply them. It asks one yes/no question for every pair of a § in a standards skill and an added hunk in a file that §'s Applies-to globs match, so every rule meets every hunk it covers. A § whose Applies to line says `by trigger` meets every hunk, and its question carries the Triggers line, so the answerer says no where the trigger does not match.
 
 1. `node lens.mjs ask --standards $D/standards-A/<skill> --diffs $D/heldout/diffs --split $D/split.json --out $L/questions.jsonl` reads the diffs `stage.mjs` gave the reviewers. Each pair gets a `#violates` yes/no question, plus a `#line` choice of the added line that shows it and a `#heuristic` choice of the sign that fires. The three share the hunk as their state, so an answerer that groups by state reads each hunk once. A hunk that adds more than 40 lines is cut into pieces.
 2. Answer the file with a judgment model, or with an agent. An agent may answer only the `#violates` questions.

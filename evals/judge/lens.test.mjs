@@ -66,6 +66,8 @@ test('a § file yields its number, globs, rule and heuristics', () => {
     section: '§3.2',
     title: 'Write Long help as Markdown',
     globs: ['pkg/cmd/**/*.go', 'api/*.go'],
+    byTrigger: false,
+    triggers: "adding a command's `Long`",
     rule: 'Put verbatim text in backticks.',
     heuristics: ['A flag name without backticks.', 'A path without backticks.'],
   });
@@ -144,4 +146,13 @@ test('the CLI writes questions, then one findings file per held-out change', () 
   assert.equal(r.status, 0, r.stderr);
   const read = (n) => JSON.parse(readFileSync(join(dir, 'review', 'lens', `${n}.json`), 'utf8')).findings.length;
   assert.deepEqual([read('42'), read('43')], [1, 0]);
+});
+
+test('a by-trigger § meets every hunk, and its question carries the trigger', () => {
+  const lens = parseLens(LENS.replace(/^- Applies to:.*$/m, '- Applies to: by trigger').replace(/^- Triggers:.*$/m, '- Triggers: a `heredoc.Doc(` call in the added lines'));
+  assert.equal(lens.byTrigger, true);
+  assert.deepEqual(lens.globs, []);
+  const qs = ask({ lenses: [lens], diffs: [['7', DIFF]] }).filter((q) => q.id.endsWith('#violates'));
+  assert.deepEqual(qs.map((q) => q.file), ['pkg/cmd/x/x.go', 'docs/readme.md']);
+  assert.match(qs[0].prompt, /applies only where the added lines match its trigger: a `heredoc\.Doc\(` call in the added lines\./);
 });

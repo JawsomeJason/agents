@@ -21,6 +21,7 @@ const VIOLATES = (l) =>
     'Does this added code violate this rule?',
     `Rule (${l.section}): ${l.rule}`,
     `Heuristics:\n${l.heuristics.map((h) => `- ${h}`).join('\n')}`,
+    ...(l.byTrigger ? [`The rule applies only where the added lines match its trigger: ${l.triggers}. When none match, the answer is no.`] : []),
     'Judge only the lines marked +. Context lines and code outside the hunk are not part of the change.',
   ].join('\n');
 const WHERE = (l) => `Assume the added code violates ${l.section} (${l.rule}). Which added line shows it most clearly?`;
@@ -43,10 +44,11 @@ export function globToRegExp(glob) {
   return new RegExp(`^${re}$`);
 }
 
-// Reads one § file: its number, the Applies-to globs, the Rule paragraph and the Heuristics list.
+// Reads one § file: its number, the Applies-to globs or `by trigger`, the Triggers line, the Rule paragraph and the Heuristics list.
 export function parseLens(text) {
   const title = /^# (§\d+\.\d+)\s+(.*)$/m.exec(text);
   const applies = /^- Applies to:(.*)$/m.exec(text);
+  const triggers = /^- Triggers:(.*)$/m.exec(text)?.[1].trim() ?? '';
   const section = (name) => new RegExp(`^## ${name}\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, 'm').exec(text)?.[1].trim();
   const rule = section('Rule');
   if (!title || !applies || !rule) throw new JudgeError('a § file lacks its title, Applies to line or Rule section');
@@ -55,7 +57,9 @@ export function parseLens(text) {
     .filter((l) => l.startsWith('- '))
     .map((l) => l.slice(2).trim());
   const globs = [...applies[1].matchAll(/`([^`]+)`/g)].map((m) => m[1]);
-  return { section: title[1], title: title[2], globs, rule: rule.replace(/\s+/g, ' '), heuristics };
+  // A `by trigger` § names no globs: its Triggers line decides, so every hunk meets it.
+  const byTrigger = /\bby trigger\b/.test(applies[1]);
+  return { section: title[1], title: title[2], globs, byTrigger, triggers, rule: rule.replace(/\s+/g, ' '), heuristics };
 }
 
 export function readLenses(skillDir) {
@@ -131,7 +135,7 @@ export function ask({ lenses, diffs }) {
     for (const h of parseHunks(diff)) {
       const state = JSON.stringify({ change, file: h.file, hunk: render(h) });
       const added = h.lines.filter((l) => l.kind === '+');
-      for (const { l } of matchers.filter((m) => m.res.some((re) => re.test(h.file)))) {
+      for (const { l } of matchers.filter((m) => m.l.byTrigger || m.res.some((re) => re.test(h.file)))) {
         const id = `${change}/${h.file}:${h.start}/${l.section}`;
         const base = { pair: id, change, file: h.file, start: h.start, section: l.section, state };
         questions.push({ ...base, id: `${id}#violates`, kind: 'yesno', prompt: VIOLATES(l), rule: l.rule, heuristics: l.heuristics });
