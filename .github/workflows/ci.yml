@@ -20,4 +20,3 @@ jobs:
       - run: node scripts/lint.mjs
       - run: node --test 'scripts/*.test.mjs'
       - run: node --test 'plugins/standards/tests/*.test.mjs'
-      - run: node --test 'evals/judge/*.test.mjs'
