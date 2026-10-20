@@ -2,6 +2,7 @@
 // Grades reviewer findings against the human comments on the held-out changes.
 //   collect    copy each workspace's findings.json into the data folder
 //   pairs      write one yes/no question per finding and human comment on the same file within --window lines
+//   consensus  accept a verdict where two graders agree, send disagreements to a third, write the consensus answers
 //   calibrate  sample pairs for hand labels, then report grader agreement once they are filled in
 //   score      recall, false positives and tokens per arm
 import { existsSync, readFileSync } from 'node:fs';
@@ -11,6 +12,7 @@ import { ARMS, JudgeError, args, main, need, readJson, readJsonl, seededShuffle,
 const USAGE = [
   'usage: grade.mjs collect --data <dir>',
   '       grade.mjs pairs --data <dir> [--window 10]',
+  '       grade.mjs consensus --data <dir> [--first <answers>] [--second <answers>] [--third <answers>]',
   '       grade.mjs calibrate --data <dir> [--answers <pairs answers>] [--n 30] [--seed 7]',
   '       grade.mjs score --data <dir> [--answers <pairs answers>] [--threshold 0.5]',
 ].join('\n');
@@ -95,6 +97,57 @@ function pairs(data, window) {
   writeJsonl(join(data, 'grade', 'pairs.questions.jsonl'), rows);
   const byArm = Object.fromEntries(ARMS.map((a) => [a, rows.filter((p) => p.arm === a).length]));
   console.log(`${rows.length} candidate pairs within ${window} lines: ${JSON.stringify(byArm)}`);
+}
+
+// Two graders answer every pair: by default a judgment model into pairs.answers.model.jsonl and
+// a subagent into pairs.answers.subagent.jsonl. Where they agree, that is the verdict. Where they
+// differ, a third grader, a fresh subagent, answers only those pairs and its vote breaks the tie.
+// The harness only reads and writes these files, so any answerer can fill each one.
+export function consensusOf(rows, first, second, third) {
+  const votes = {};
+  const answers = [];
+  const disputed = [];
+  for (const r of rows) {
+    const [a, b] = [first.get(r.id), second.get(r.id)];
+    if (!a || !b) throw new JudgeError(`pair ${r.id} lacks an answer from the ${!a ? 'first' : 'second'} grader`);
+    const v = { first: says(a), second: says(b) };
+    if (v.first !== v.second) {
+      const c = third.get(r.id);
+      if (!c) {
+        disputed.push(r);
+        votes[r.id] = v;
+        continue;
+      }
+      v.third = says(c);
+    }
+    v.verdict = v.third ?? v.first;
+    votes[r.id] = v;
+    const ballots = [v.first, v.second, v.third].filter((x) => x !== undefined);
+    const share = ballots.filter((x) => x === v.verdict).length / ballots.length;
+    answers.push({ question_id: r.id, answer: v.verdict, confidence: round(share), answered_by: 'consensus', votes: v });
+  }
+  const agreed = rows.filter((r) => votes[r.id].first === votes[r.id].second).length;
+  return { answers, disputed, votes, agreed, agreement: rows.length ? round(agreed / rows.length) : null };
+}
+
+function consensus(data, files) {
+  const rows = readJsonl(join(data, 'grade', 'pairs.questions.jsonl'));
+  const [first, second] = [files.first, files.second].map(readAnswers);
+  const third = existsSync(files.third) ? new Map(readJsonl(files.third).map((a) => [a.question_id, a])) : new Map();
+  const result = consensusOf(rows, first, second, third);
+  const summary = { pairs: rows.length, agreed: result.agreed, agreement: result.agreement, disagreed: rows.length - result.agreed, awaiting_third: result.disputed.length, files };
+  writeJson(join(data, 'grade', 'consensus.json'), { ...summary, votes: result.votes });
+  if (result.disputed.length) {
+    const out = join(data, 'grade', 'pairs.tiebreak.questions.jsonl');
+    writeJsonl(out, result.disputed);
+    console.log(JSON.stringify(summary));
+    console.log(`${result.disputed.length} pairs need a third grader: have a fresh subagent answer ${out} into ${files.third}, then rerun`);
+    process.exitCode = 1;
+    return;
+  }
+  writeJsonl(join(data, 'grade', 'pairs.answers.jsonl'), result.answers);
+  console.log(JSON.stringify(summary));
+  console.log(`wrote ${join(data, 'grade', 'pairs.answers.jsonl')}`);
 }
 
 function readAnswers(file) {
@@ -198,7 +251,7 @@ main((argv) => {
   const [command, ...rest] = argv;
   const { values } = args(
     rest,
-    { data: { type: 'string' }, window: { type: 'string', default: '10' }, answers: { type: 'string' }, n: { type: 'string', default: '30' }, seed: { type: 'string', default: '7' }, threshold: { type: 'string', default: '0.5' } },
+    { data: { type: 'string' }, window: { type: 'string', default: '10' }, answers: { type: 'string' }, first: { type: 'string' }, second: { type: 'string' }, third: { type: 'string' }, n: { type: 'string', default: '30' }, seed: { type: 'string', default: '7' }, threshold: { type: 'string', default: '0.5' } },
     USAGE,
   );
   need(values, ['data'], USAGE);
@@ -208,6 +261,10 @@ main((argv) => {
   if (command === 'pairs') {
     writeJson(join(data, 'grade', 'pairs.meta.json'), { window: Number(values.window), prompt: SAME_CONCERN });
     return pairs(data, Number(values.window));
+  }
+  if (command === 'consensus') {
+    const file = (k, name) => resolve(values[k] ?? join(data, 'grade', name));
+    return consensus(data, { first: file('first', 'pairs.answers.model.jsonl'), second: file('second', 'pairs.answers.subagent.jsonl'), third: file('third', 'pairs.answers.tiebreak.jsonl') });
   }
   if (command === 'calibrate') return calibrate(data, answersFile, Number(values.n), Number(values.seed));
   if (command === 'score') return score(data, answersFile, Number(values.threshold));
