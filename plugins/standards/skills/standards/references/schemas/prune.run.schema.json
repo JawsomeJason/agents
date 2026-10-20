@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "prune run record",
+  "description": "run.json inside each run folder, written by `scripts/prune.mjs step` when an agent session finishes with a usable diff. A folder without it is an unfinished run and is redone. The folder also holds diff.patch, message.txt and output.log.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["section", "harness", "arm", "run", "model", "version", "started_at", "finished_at", "duration_ms", "exit_code", "files_changed", "diff_bytes"],
+  "properties": {
+    "section": { "type": "string", "pattern": "^§\\d+(\\.\\d+)*$" },
+    "harness": { "type": "string", "minLength": 1 },
+    "arm": { "enum": ["none", "one-liner", "full"] },
+    "run": { "type": "integer", "minimum": 1, "description": "1-based index within this section, arm and harness." },
+    "model": { "type": ["string", "null"], "description": "The model ID the session ran on, as the harness reported it. Data only." },
+    "version": { "type": ["string", "null"], "description": "The harness's reported version." },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "exit_code": { "type": ["integer", "null"], "description": "The harness process's exit code." },
+    "files_changed": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "description": "Repo-relative paths the agent changed or added." },
+    "diff_bytes": { "type": "integer", "minimum": 1, "description": "Size of the full diff before any cut." },
+    "usage": { "type": ["object", "null"], "description": "Token counts the harness reported, when it reports them. Data only." }
+  }
+}

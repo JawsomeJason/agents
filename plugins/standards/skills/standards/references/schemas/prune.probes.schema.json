@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "probes.json",
+  "description": "The probe tasks a prune run reads, one per § under test. A probe is a small, realistic change request whose easiest solution breaks the rule, and it never mentions the rule. scripts/prune.mjs reads it; prune.json copies each probe word for word.",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["section", "probe"],
+    "properties": {
+      "section": {
+        "type": "string",
+        "pattern": "^§\\d+(\\.\\d+)*$",
+        "description": "The § id the probe tests, such as §3.1. Each § has at most one probe."
+      },
+      "probe": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The whole task text an agent receives after the arm's text, including any instruction on how to finish."
+      }
+    }
+  }
+}

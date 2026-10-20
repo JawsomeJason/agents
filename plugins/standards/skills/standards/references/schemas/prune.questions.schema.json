@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "prune grading questions line",
+  "description": "One yes/no question per line of grading/<grader>.questions.jsonl, written by `scripts/prune.mjs step`. Each asks whether one agent output follows the rule. The id is an opaque hash of the run, so a grader cannot tell which arm or harness produced the output.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "section", "prompt", "criteria", "state"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[0-9a-f]{12}#complies$", "description": "An opaque run hash, a #, then complies." },
+    "kind": { "const": "yesno", "description": "A probability that the condition holds, as a yes or no." },
+    "section": { "type": "string", "pattern": "^§\\d+(\\.\\d+)*$", "description": "The § the rule comes from." },
+    "prompt": { "type": "string", "minLength": 1, "description": "The question, with the rule's one-liner." },
+    "criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["true", "false"],
+      "properties": {
+        "true": { "type": "string", "minLength": 1, "description": "What a yes means, including that a diff touching nothing the rule governs complies." },
+        "false": { "type": "string", "minLength": 1, "description": "What a no means." }
+      },
+      "description": "What each answer means, in the form a judgment model takes for a yes/no question."
+    },
+    "state": { "type": "string", "minLength": 1, "description": "The whole § file and the diff the agent produced, in that order. The diff is cut at a file boundary when it is long." }
+  }
+}
