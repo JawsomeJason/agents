@@ -9,7 +9,7 @@
     {
       "name": "standards",
       "description": "Mines a repo's review history into coding standards that agents follow while they write code, and prunes the rules agents already follow.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "source": "./plugins/standards"
     }
   ]
