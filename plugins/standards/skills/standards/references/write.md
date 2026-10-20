@@ -82,7 +82,8 @@ Copy [the section template](../assets/section.template.md) to `references/s<area
 - **Glob breadth.** No glob may match more than about 25% of the repo's tracked files of its kind: files with the glob's extension, or all tracked files when it names none. Count both with `git ls-files` and a short script. A glob that broad triggers its lens on almost every change, which loads the § and invites findings on code the rule never meant. Narrow the glob to the directories the evidence sits in. When the rule truly applies everywhere its file kind appears, write `Applies to: by trigger` instead, and make the Triggers line a pattern a reviewer can match against added lines, such as a call, an import or a type, so the trigger lives in the heuristic rather than the path.
 - **Failure model.** Name each way the rule gets broken, with a default severity from the cluster's comments.
 - **Examples.** Write both examples in the repo's language, against its real types and helpers, and check that each one compiles or parses. A broken example teaches the wrong code to every agent that copies it.
-- **Heuristics.** Write patterns a reviewer can match against added lines, such as a call, an import or a missing step.
+- **Heuristics.** Write patterns a reviewer can match against added lines, such as a call, an import or a missing step. Write at least one heuristic per noun or construct the Rule sentence names: a rule about flag names, program names and example titles needs a heuristic for each, not only for flags. A reviewer leans on the heuristics to find lines, so a thing the rule names but no heuristic covers is a thing reviewers miss.
+- **Evidence against heuristics.** After each Evidence item, add a short `fires: <heuristic>` note naming the heuristic that matches the code that comment was about. When none fires, add a heuristic that does, or drop the item and cite another. Evidence that no heuristic catches shows the heuristics miss the very cases the rule was mined from.
 - **Confirmed when.** Set the bar for reporting a violation, and say what evidence of an intended exception clears it.
 
 ## Step 6. Write the index
@@ -98,6 +99,7 @@ When the source repo of this skill is at hand, run its lint on the generated fol
 - Frontmatter uses only `name`, `description`, `license`, `compatibility`, `metadata` and `allowed-tools`.
 - `name` matches the folder, and the body of `SKILL.md` stays under about 5000 tokens, at 4 characters per token.
 - Every link resolves inside the skill folder, and every § file has an index line.
+- Every Evidence item has a `fires:` line naming one of its § heuristics, and every noun or construct the Rule sentence names has a heuristic.
 - Every § has a why, at least 3 evidence lines, globs that match tracked files and none broader than about 25% of their kind, and a confirmed-when bar.
 - No § carries a URL, a date, or a time-relative word outside a quoted excerpt, because each one goes stale while the rule still holds. A reviewer's quoted words stay verbatim, so the lint skips blockquotes for time words.
 

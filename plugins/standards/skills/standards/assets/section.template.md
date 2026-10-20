@@ -16,14 +16,20 @@ Paired standard: rule §{{ id }} in [the index](../SKILL.md). This file is the l
 
 ## Evidence
 
-{{ At least 3 review comments, one list item each, in this form. The excerpt sits in a blockquote under its item, so a reviewer's own words stay verbatim even when they use a time word. }}
+{{ At least 3 review comments, one list item each, in this form. The excerpt sits in a blockquote under its item, so a reviewer's own words stay verbatim even when they use a time word. The `fires:` line names the heuristic below that matches the code the comment was about. }}
 
 - {{ change id }} `{{ path }}`:
   > {{ excerpt, under 200 characters }}
+
+  fires: {{ heuristic }}
 - {{ change id }} `{{ path }}`:
   > {{ excerpt }}
+
+  fires: {{ heuristic }}
 - {{ change id }} review body:
   > {{ excerpt from a review's summary text, which has no path }}
+
+  fires: {{ heuristic }}
 
 ## Failure model
 
@@ -42,6 +48,8 @@ Follows the rule:
 {{ a fenced code block showing the same change done right }}
 
 ## Heuristics
+
+{{ At least one per noun or construct the Rule sentence names. Every Evidence item's `fires:` line names one of these. }}
 
 - {{ a pattern a reviewer can match against the added lines of a diff, such as a call, an import or a missing step }}
 
