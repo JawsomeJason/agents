@@ -28,7 +28,7 @@ Then review the diff the ordinary way first, before opening any standards: bugs,
 
 ## Step 2. Find the standards
 
-Find every `SKILL.md` in the repo whose frontmatter `metadata` holds `generator: standards`. Shape A gives one such skill, and shape B gives one per area. Use them all.
+Find every `SKILL.md` in the repo whose frontmatter `metadata` holds `generator: standards`. Use every one you find.
 
 When there are none, ask the user for the path of their standards. When they have none, offer `mine`, and stop.
 

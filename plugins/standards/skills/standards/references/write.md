@@ -39,21 +39,9 @@ When a user invoked `write` interactively, wait for their go-ahead on the table,
 
 A `missing` or `thin` convention that a tool could check is a check candidate. Write its § anyway, so the convention is covered until the check exists, and list it in the report. A check fails every time, while a § works only when someone reads it.
 
-## Step 3. Pick the output shape
+## Step 3. Lay out the output
 
-Shape A is the default. Write one skill, named `<repo-slug>-standards`, with the index as its `SKILL.md` and one `references/s<area>-<n>-<slug>.md` file per §. An agent loads one short index and opens only the § files a change touches.
-
-Shape B is the option. Write one skill per area, named `<repo-slug>-standards-<area>`, each with its own description, index and § files. Each area then triggers on its own, at the cost of one description per area held in context.
-
-Write each shape B description so it loads its area and no other:
-
-- Say what the area covers, by the file kinds its globs match and the code it governs, such as "HTTP handlers under `api/`".
-- Name the edit kinds from its § Triggers lines as "Use when" triggers, such as adding an endpoint or changing a response type.
-- Keep rule text out. The description decides when to load the skill, and the index carries the rules.
-- Make each area's triggers distinct from every other area's, so one edit does not load two areas for one rule.
-- Stay within 1024 characters.
-
-Use B only when the user asks for it, or when a shape experiment on this repo picked it. See "Shape experiment" below.
+Write one skill, named `<repo-slug>-standards`, with the index as its `SKILL.md` and one `references/s<area>-<n>-<slug>.md` file per §. An agent loads one short index and opens only the § files a change touches, and one description costs less context than one per area.
 
 Place the folder where the repo keeps its skills. When the repo has no skills folder, ask the user where it should go. `<repo-slug>` is the repository's name without its owner, lowercased, with every run of other characters as one hyphen, such as `cli` for `cli/cli`. The prefix keeps the generated skill from sharing a name with this one.
 
@@ -65,7 +53,7 @@ A cluster is one label, not always one rule. Before numbering, read each kept cl
 - **Pool** evidence across clusters when comments under another label ask for the same rule. A labeler picks one label per comment, so a rule's evidence can sit in two clusters.
 - Each rule cites only the comments that ask for it, and each rule on its own needs comments from at least 3 distinct changes and 2 distinct reviewers, the same floor `mine` applies. A rule that falls under the floor after a split is left out and listed in the report as "too little evidence", because the floor is what keeps one reviewer's taste out of the standards.
 
-1. Group the rules that survive into 1 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling. Size the areas to the rules: a handful of rules may need only one or two areas, and an area of one rule is fine when no other rule shares its part of the code. Splitting few rules across many areas adds index headings, and in shape B whole descriptions, without helping an agent find a rule.
+1. Group the rules that survive into 1 to 8 areas, each one a part of the codebase or a kind of change, such as data access or error handling. Size the areas to the rules: a handful of rules may need only one or two areas, and an area of one rule is fine when no other rule shares its part of the code. Splitting few rules across many areas adds index headings without helping an agent find a rule.
 2. Give each rule the rank of the cluster that holds most of its own evidence, since a split or pooled rule has no rank of its own. Order the areas by their best rule rank, and number them §1, §2 and on. Within an area, number rules by rank: §1.1, §1.2.
 3. When updating earlier standards, keep every existing number and append new rules at the end of their area. Review comments cite § numbers, and renumbering breaks those citations.
 4. Break ties in rank, such as two rules split from one cluster, by more distinct changes in the rule's own evidence, then more comments, then higher mean severity, then the slug in alphabetical order. A fixed order keeps the numbers the same when `write` reruns.
@@ -108,15 +96,3 @@ Done when every check passes.
 ## Step 8. Report
 
 List the files written, the § count per area, the homes table from step 2 with each thin home and its pointer offer, each existing rule marked `dead` with the file, API or tool it names that is gone, the check candidates, any cluster left out for having no why, each cluster split into several rules or pooled into another, and any rule left out for too little evidence. Offer `prune` next, because a rule agents already follow costs tokens on every load and changes nothing.
-
-## Shape experiment
-
-Run it when the user wants to know whether shape B beats shape A on their repo.
-
-1. Hold out the 20 newest merged changes that each have at least 2 inline comments from reviewers (not bots, not the change's author). Most merged changes get no inline comments, so the last 20 alone leave little to score. Run `mine` only on changes merged before the oldest held-out change was opened, so no mined comment describes code a held-out review will see. Write the standards against the repo as it stood then, for the same reason.
-2. Write shape A and shape B from the same `clusters.json`, into two separate scratch folders.
-3. For each held-out change, spawn three fresh reviewer subagents: one with no standards, and one per shape. Give each the change's diff as it stood at the commit the first reviewer comment points at, so fixes made in answer to review are not in it, plus only its own shape's standards. Have the shape reviewers do an ordinary review and then run `review` on top of it, so a shape is scored as the extra pass it is. The no-standards reviewer is the baseline, because a shape that wins against the other shape but not against no standards adds nothing.
-4. Score each shape on three numbers. Recall is the share of the human convention comments on the held-out changes that the reviewer also raised. False positives are findings no human raised and the confirmed-when bar does not support, per change. Tokens loaded are the characters of every standards file the reviewer read, divided by 4, per review.
-5. Pick the winner. Higher recall wins. Recall within one caught comment across the 20 changes is a tie, settled by fewer false positives, then by fewer tokens. A tie on all three goes to A, because one description costs less context than many.
-
-Report the three numbers for each shape and the winner. Use the winner's shape for this repo's standards from then on.

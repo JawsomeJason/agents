@@ -69,5 +69,4 @@ Work files live in `.standards/` at the target repo's root. Keep that folder out
 ## Generated standards
 
 - The default output is one skill with an index of one-liners, each linking to a § file. Templates: [index](assets/index.template.md) and [section](assets/section.template.md).
-- One skill per area is an option, settled per repo by the shape experiment in [references/write.md](references/write.md).
 - Generated standards follow the same rules as this skill: spec frontmatter only, no URLs, no dates, and a why for every rule.
