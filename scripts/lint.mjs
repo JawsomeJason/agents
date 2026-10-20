@@ -109,12 +109,15 @@ function maskCode(text, maskInline) {
 
 const isQuote = (line) => /^\s*>/.test(line);
 
+// Code files are scanned raw: their backticks and fences are not Markdown.
+const RAW_SCOPES = new Set(['code']);
+
 // quoteExempt lists rules that skip blockquoted lines, where generated standards quote reviewers verbatim.
 function scanDenylists(file, text, scope, report, { skip = [], quoteExempt = [] } = {}) {
   for (const list of denylists) {
     if (!list.scopes.includes(scope) || skip.includes(list.rule)) continue;
     const skipQuotes = quoteExempt.includes(list.rule);
-    maskCode(text, list.skipInlineCode).forEach((line, i) => {
+    (RAW_SCOPES.has(scope) ? text.split('\n') : maskCode(text, list.skipInlineCode)).forEach((line, i) => {
       if (skipQuotes && isQuote(line)) return;
       for (const re of list.regexes) {
         re.lastIndex = 0;
@@ -215,6 +218,14 @@ function lintSkill(skillDir, report) {
     scanDenylists(file, body, 'skill', report, exempt);
     scanUrls(file, body, report);
     scanLinks(file, body, skillDir, report);
+  }
+  // Scripts and schemas ship with the skill too, so they carry no identity, no time word and no stray URL.
+  for (const file of listFiles(skillDir, (f) => /\.(mjs|json)$/.test(f))) {
+    let body = readFileSync(file, 'utf8');
+    // A schema's top-level $schema names the JSON Schema dialect, the one URL a schema must carry.
+    if (file.endsWith('.json')) body = body.replace(/^(\s{0,2}"\$schema"\s*:\s*)"[^"]*"/m, (m, key) => key + ' '.repeat(m.length - key.length));
+    scanDenylists(file, body, 'code', report, exempt);
+    scanUrls(file, body, report);
   }
 
   const scriptsDir = join(skillDir, 'scripts');

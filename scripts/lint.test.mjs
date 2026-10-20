@@ -39,6 +39,7 @@ const expected = {
   'time-word': 'time-word',
   'url-allowlist': 'url-allowlist',
   'vendor-name': 'vendor-name',
+  'skill-code-url': 'url-allowlist',
 };
 
 const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term', 'fence-nested'];
@@ -109,4 +110,8 @@ test('a private denylist named by STANDARDS_LINT_PRIVATE_DENYLIST adds its terms
 
 test('a ``` line inside a ```` fence stays code, so a time word there passes', () => {
   assert.deepEqual(lint(fixture('fence-nested')), []);
+});
+
+test('a skill script is scanned, and only a schema\'s top-level $schema URL is exempt', () => {
+  assert.deepEqual(lint(fixture('skill-code-url')).map((e) => `${e.file.split('/').slice(-2).join('/')}:${e.line}`), ['scripts/fetch.mjs:1']);
 });

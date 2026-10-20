@@ -93,7 +93,7 @@
     {
       "rule": "time-word",
       "message": "time-relative wording rots; state the fact without a time anchor",
-      "scopes": ["skill", "doc"],
+      "scopes": ["skill", "doc", "code"],
       "skipInlineCode": true,
       "flags": "i",
       "patterns": [
@@ -127,7 +127,7 @@
     {
       "rule": "org-term",
       "message": "names a person, org or private location; skills must work for any user",
-      "scopes": ["skill", "doc"],
+      "scopes": ["skill", "doc", "code"],
       "skipInlineCode": false,
       "flags": "i",
       "patterns": [
