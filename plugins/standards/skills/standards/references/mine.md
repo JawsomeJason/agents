@@ -63,6 +63,7 @@ A judgment model is a fast model that answers typed questions (pick one of a set
 
 - Send a comment's three questions in one request when the judgment model accepts several, because they share one state.
 - Record the model's ID in `model` and set `answered_by` to `judgment-model`.
+- Set `confidence` to the probability of the chosen answer: for a choice or score, the chosen option's or level's probability. A model's own confidence figure may measure how concentrated the whole distribution is, which is not the chance this answer is right, and the check's threshold assumes the latter.
 - Keep answers whose question ids are unchanged since the last run. Re-asking costs time and money and returns the same answer.
 - When you answer yourself, spawn subagents over batches of about 200 questions, so the comment text stays out of your own context. Give each answer an honest `confidence`.
 
