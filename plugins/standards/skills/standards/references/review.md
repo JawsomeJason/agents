@@ -38,25 +38,34 @@ Load only the triggered § files. Every extra § costs context and invites findi
 
 ## Step 4. Apply each lens
 
-For each triggered §, check its heuristics against the added and changed lines of each matching file. Read enough of the surrounding file to judge each match. A heuristic match is a candidate, not yet a finding.
+For each triggered §, read its Rule sentence against every added hunk of each file its globs cover, and ask whether that hunk breaks it. The Rule sentence is the test. Its heuristics are leads that point at likely lines, never the gate: a hunk that no heuristic matches can still break the rule, because heuristics list the cases the evidence showed, and new code breaks rules in new ways. Read enough of the surrounding file, and of the sibling code the rule points at, to judge each hunk. A hunk that seems to break the rule is a candidate, not yet a finding.
 
 ## Step 5. Confirm each candidate
 
 Hold each candidate to its § "Confirmed when" bar. Drop any candidate that falls short, and drop any that a comment, a test or the § itself marks as an intended exception. A false positive teaches the team to skim past the next real finding.
 
-Set each finding's severity from the § failure model, using the vector it matches.
+Set each finding's severity from the § failure model, using the vector it matches, or the § default severity when no vector fits. Report a confirmed violation at that severity even when it is a nit, and label it `nit`. Never drop a confirmed finding for being small: the standards exist because reviewers raised these points, so a small one is still one the team asked for.
 
 Done when every candidate is either confirmed or dropped against its bar.
 
 ## Step 6. Report
 
-Write one line per finding, sorted by severity, blockers first:
+Anchor each finding on the line the fix changes, such as the declaration of the function, parameter, type or name to change, rather than a line where the symptom shows. When the fix reaches other lines, name those call sites in the message. An author fixes the line a finding points at, so a finding on the symptom gets the symptom patched.
+
+Write one line per finding, sorted by severity, blockers first, nits last:
 
 ```text
 §3.1 major src/api/users.ts:42 The handler returns the database document, so internal fields reach the client. Map it to a response DTO first.
 §1.2 minor src/jobs/sync.ts:17 The retry loop has no limit, so a bad record retries forever. Cap it, as §1.2 shows.
+§2.1 nit src/jobs/sync.ts:9 `refs` holds jobs, not references. Name it `jobs`, here and at lines 21 and 30.
 ```
 
-After the findings, give the count of triggered lenses and the count of findings. When nothing is confirmed, say so plainly and name the lenses applied, so the author knows what was checked.
+End with a coverage list: one line per triggered §, naming the files it was applied to, then the count of findings. A § with no finding still gets its line, so the author knows what was checked and a skipped § shows:
+
+```text
+Applied §1.2 to src/jobs/sync.ts, src/jobs/retry.ts
+Applied §2.1 to src/jobs/sync.ts
+3 findings
+```
 
 Post findings to the forge only when the user asks. The user decides what reaches reviewers.
