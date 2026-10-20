@@ -6,6 +6,24 @@ import { fileURLToPath } from 'node:url';
 const RULES = JSON.parse(readFileSync(new URL('./lint-rules.json', import.meta.url), 'utf8'));
 const SKIP_DIRS = new Set(['.git', 'node_modules']);
 
+// Names of real people, employers and private packages stay out of this public file. A maintainer keeps them in
+// a private list outside the repo and points this variable at it; its patterns join org-term.
+const PRIVATE_ENV = 'STANDARDS_LINT_PRIVATE_DENYLIST';
+if (process.env[PRIVATE_ENV]) {
+  let extra;
+  try {
+    extra = JSON.parse(readFileSync(process.env[PRIVATE_ENV], 'utf8'));
+  } catch (e) {
+    console.error(`${PRIVATE_ENV}=${process.env[PRIVATE_ENV]} is not a readable JSON file: ${e.message}`);
+    process.exit(2);
+  }
+  if (!Array.isArray(extra.patterns) || !extra.patterns.every((p) => typeof p === 'string')) {
+    console.error(`${PRIVATE_ENV} must name a file holding {"patterns": ["regex", ...]}`);
+    process.exit(2);
+  }
+  RULES.denylists.find((l) => l.rule === 'org-term').patterns.push(...extra.patterns);
+}
+
 const denylists = RULES.denylists.map((list) => ({
   ...list,
   regexes: list.patterns.map((p) => new RegExp(p, `g${list.flags}`)),

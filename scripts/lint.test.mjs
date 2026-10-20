@@ -39,7 +39,7 @@ const expected = {
   'vendor-name': 'vendor-name',
 };
 
-const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder'];
+const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term'];
 
 test('every fixture directory has an expectation', () => {
   const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => !passing.includes(d));
@@ -90,4 +90,17 @@ test('cli exits zero on a clean folder', () => {
   const run = spawnSync(process.execPath, [cli, fixture('clean')], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stdout);
   assert.equal(run.stdout, '');
+});
+
+test('a private denylist named by STANDARDS_LINT_PRIVATE_DENYLIST adds its terms to org-term', () => {
+  const cli = fileURLToPath(new URL('./lint.mjs', import.meta.url));
+  const target = fixture('private-term');
+  const without = spawnSync(process.execPath, [cli, target], { encoding: 'utf8', env: { ...process.env, STANDARDS_LINT_PRIVATE_DENYLIST: '' } });
+  assert.equal(without.status, 0, without.stdout);
+  const withList = spawnSync(process.execPath, [cli, target], { encoding: 'utf8', env: { ...process.env, STANDARDS_LINT_PRIVATE_DENYLIST: `${target}/denylist.json` } });
+  assert.equal(withList.status, 1);
+  assert.match(withList.stdout, /SKILL\.md:8 org-term "Acme Widgets" /);
+  const missing = spawnSync(process.execPath, [cli, target], { encoding: 'utf8', env: { ...process.env, STANDARDS_LINT_PRIVATE_DENYLIST: `${target}/nope.json` } });
+  assert.notEqual(missing.status, 0, 'a named list that cannot be read fails instead of passing silently');
+  assert.match(missing.stderr, /STANDARDS_LINT_PRIVATE_DENYLIST=.*nope\.json is not a readable JSON file/);
 });

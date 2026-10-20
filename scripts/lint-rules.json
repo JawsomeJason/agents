@@ -131,22 +131,13 @@
       "skipInlineCode": false,
       "flags": "i",
       "patterns": [
-        "\\bJason\\b",
-        "\\bFeatheringham\\b",
         "\\bJawsomeJason\\b",
-        "\\bREDACTED\\b",
-        "jawsomejason\\.com",
-        "\\bREDACTED\\b",
-        "\\bREDACTED\\b",
-        "REDACTED\\b",
-        "\\bREDACTED\\b",
         "/Users/[\\w.-]+",
         "/home/[\\w.-]+",
         "~/\\.claude\\b",
         "\\bMEMORY\\.md\\b",
         "\\bCLAUDE\\.local\\.md\\b",
         "\\bauto-memory\\b",
-        "\\bREDACTED\\b",
         "\\bGoogle Drive\\b"
       ]
     }
