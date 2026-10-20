@@ -27,9 +27,14 @@
       }
     },
     "min_count": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Clusters with fewer comments are dropped. Default 3."
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changes", "reviewers"],
+      "properties": {
+        "changes": { "type": "integer", "minimum": 1, "description": "Fewest distinct changes a kept cluster's comments come from. Default 3." },
+        "reviewers": { "type": "integer", "minimum": 1, "description": "Fewest distinct reviewers a kept cluster's comments come from. Default 2." }
+      },
+      "description": "A cluster is kept only when its comments span at least this many distinct changes and distinct reviewers. Comment count alone lets one reviewer on one change make a convention."
     },
     "severity_weights": {
       "type": "object",
@@ -49,7 +54,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["rank", "label", "description", "count", "severity", "score", "review_ids", "changes", "paths", "examples"],
+        "required": ["rank", "label", "description", "count", "severity", "score", "review_ids", "changes", "reviewers", "paths", "examples"],
         "properties": {
           "rank": { "type": "integer", "minimum": 1, "description": "1 for the highest score." },
           "label": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The label id from labels.json." },
@@ -59,6 +64,7 @@
           "score": { "type": "number", "description": "count times severity." },
           "review_ids": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "Every reviews.jsonl id in the cluster." },
           "changes": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "Distinct change numbers the comments came from." },
+          "reviewers": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "minItems": 1, "description": "Distinct reviewer logins the comments came from." },
           "paths": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "Distinct file paths the comments are attached to. write derives globs from these." },
           "examples": {
             "type": "array",
@@ -86,10 +92,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["label", "count"],
+        "required": ["label", "count", "changes", "reviewers"],
         "properties": {
           "label": { "type": "string" },
-          "count": { "type": "integer", "minimum": 0 }
+          "count": { "type": "integer", "minimum": 0, "description": "Comments with this label." },
+          "changes": { "type": "integer", "minimum": 0, "description": "Distinct changes those comments came from." },
+          "reviewers": { "type": "integer", "minimum": 0, "description": "Distinct reviewers those comments came from." }
         }
       }
     }

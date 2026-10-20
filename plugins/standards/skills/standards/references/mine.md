@@ -35,7 +35,7 @@ Output `.standards/labels.json`, a JSON array of `{ "id": "kebab-case-slug", "de
 1. Drop bot comments, and comments by the change's own author. Bots repeat rules their tool already enforces, and an author answering review states no convention a reviewer defended.
 2. Read at least 100 reviewer comments, or all of them when there are fewer. Spread the sample across the history and across directories, so one busy area does not set the labels.
 3. Name each distinct convention the reviewers ask for, at the level one rule could state. "Map database documents to DTOs before they leave a handler" is the right level. "Naming" is too broad to act on, and "rename this variable" is one site.
-4. Merge labels that a single rule would cover. Aim for 10 to 40 labels. Too broad, and a cluster holds conventions no single rule states. Too narrow, and one convention splits into clusters under the minimum count of 3.
+4. Merge labels that a single rule would cover. Aim for 10 to 40 labels. Too broad, and a cluster holds conventions no single rule states. Too narrow, and one convention splits into clusters too small to keep.
 
 Done when every comment in the sample fits a label or is plainly not a convention.
 
@@ -89,9 +89,9 @@ By hand, write a short script that does each of these, because the counts decide
 1. Keep a comment when its `label` answer is not `none`.
 2. Group the kept comments by label.
 3. Weight each comment's severity level: `nit` 1, `minor` 2, `major` 3, `blocker` 4. A cluster's `severity` is the mean weight of its comments.
-4. Move every cluster with fewer than 3 comments to `dropped`. One or two comments are one reviewer's opinion. Three show reviewers repeating themselves.
+4. Move every cluster whose comments come from fewer than 3 distinct changes, or from fewer than 2 distinct reviewers, to `dropped`. Count changes, not comments: five comments on one change are one review of one piece of code. Count reviewers too: one person repeating a request across changes is that person's taste, while a second reviewer asking the same shows a convention.
 5. Set `score` to count times severity. Sort by score, highest first, and number `rank` from 1.
-6. For each cluster, list every review id, change and path, and pick up to 5 examples that state the convention most plainly.
+6. For each cluster, list every review id, change, reviewer and path, and pick up to 5 examples that state the convention most plainly.
 
 Done when `clusters.json` validates and its counts reconcile. Every reviewer comment lands in exactly one group: labeled `none`, or kept. The two counts sum to the reviewer comment count.
 

@@ -7,7 +7,7 @@ metadata:
 
 # {{ repo }} standards
 
-Each line below is a rule that reviewers in this repo enforced at least 3 times. Follow it when you write code. When you review a diff, open the linked § for its why, its evidence, its examples and the heuristics to match against the diff.
+Each line below is a rule that reviewers in this repo enforced on at least 3 changes, more than one reviewer among them. Follow it when you write code. When you review a diff, open the linked § for its why, its evidence, its examples and the heuristics to match against the diff.
 
 A line that ends in "Read first" needs its full § in mind while you write. Open that § before you edit a file it applies to.
 

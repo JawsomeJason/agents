@@ -7,7 +7,9 @@ import { UsageError, check, isReviewerComment, readJsonl, readLabels } from './q
 
 const USAGE =
   'usage: cluster.mjs --reviews <reviews.jsonl> --questions <questions.jsonl> --answers <answers.jsonl> --labels <labels.json> --out <clusters.json>';
-export const MIN_COUNT = 3;
+// A convention needs evidence from several changes and more than one reviewer. Many comments
+// on one change, or from one person, are that reviewer's taste on that code.
+export const MIN_COUNT = { changes: 3, reviewers: 2 };
 export const SEVERITY_WEIGHTS = { nit: 1, minor: 2, major: 3, blocker: 4 };
 const MAX_EXAMPLES = 5;
 const EXCERPT_MAX = 400;
@@ -52,8 +54,10 @@ export function cluster({ reviews, questions, answers, labels }) {
   const clusters = [];
   const dropped = [];
   for (const [id, members] of groups) {
-    if (members.length < MIN_COUNT) {
-      dropped.push({ label: id, count: members.length });
+    const changes = distinct(members.map((m) => m.review.change));
+    const reviewers = distinct(members.map((m) => m.review.author));
+    if (changes.length < MIN_COUNT.changes || reviewers.length < MIN_COUNT.reviewers) {
+      dropped.push({ label: id, count: members.length, changes: changes.length, reviewers: reviewers.length });
       continue;
     }
     const severity = round(members.reduce((s, m) => s + m.weight, 0) / members.length);
@@ -67,7 +71,8 @@ export function cluster({ reviews, questions, answers, labels }) {
       severity,
       score: round(members.reduce((s, m) => s + m.weight, 0)),
       review_ids: members.map((m) => m.review.id),
-      changes: distinct(members.map((m) => m.review.change)),
+      changes,
+      reviewers,
       paths: distinct(members.map((m) => m.review.path)),
       examples: plainest.slice(0, MAX_EXAMPLES).map(({ review }) => ({
         review_id: review.id,

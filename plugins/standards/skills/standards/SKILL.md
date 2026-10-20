@@ -10,7 +10,7 @@ Reviewers enforce the same conventions by hand, comment after comment. This skil
 
 ## Core principles
 
-- Evidence first. A § needs at least 3 review comments, because one or two are a single reviewer's taste.
+- Evidence first. A § needs review comments from at least 3 distinct changes and 2 distinct reviewers, because many comments on one change, or from one person, are a single reviewer's taste.
 - Every rule carries its why. A reason still guides an agent after the code around the rule changes shape.
 - One home per convention. Two copies drift apart, and an agent follows whichever one it read first.
 - A check beats a §. A convention a linter, type or test can catch belongs in that tool, because a check runs every time.

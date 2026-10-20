@@ -10,9 +10,11 @@ const LABELS = [
   { id: 'few-blocker', description: 'A rarer, high-harm convention.' },
   { id: 'pair', description: 'Only two comments ask for this.' },
   { id: 'unused', description: 'No comment asks for this.' },
+  { id: 'one-change', description: 'Three comments, all on one change.' },
+  { id: 'one-reviewer', description: 'Three changes, all from one reviewer.' },
 ];
 
-// label, severity, label confidence
+// label, severity, label confidence, and optionally the change and reviewer
 const PLAN = [
   ['many-minor', 'minor', 0.9],
   ['many-minor', 'minor', 0.7],
@@ -26,16 +28,22 @@ const PLAN = [
   ['pair', 'major', 0.9],
   ['none', 'blocker', 0.9],
   ['none', 'nit', 0.9],
+  ['one-change', 'blocker', 0.9, '200', 'reviewer-0'],
+  ['one-change', 'blocker', 0.9, '200', 'reviewer-1'],
+  ['one-change', 'blocker', 0.9, '200', 'reviewer-0'],
+  ['one-reviewer', 'blocker', 0.9, '300', 'solo'],
+  ['one-reviewer', 'blocker', 0.9, '301', 'solo'],
+  ['one-reviewer', 'blocker', 0.9, '302', 'solo'],
 ];
 
 function setup() {
   const dir = tempDir();
-  const reviews = PLAN.map((_, i) => ({
+  const reviews = PLAN.map(([, , , change, author], i) => ({
     id: `forge:${i + 1}`,
     source: 'forge',
     kind: 'inline-comment',
-    change: String(100 + (i % 3)),
-    author: 'reviewer',
+    change: change ?? String(100 + (i % 3)),
+    author: author ?? `reviewer-${i % 2}`,
     author_is_bot: false,
     created_at: '2024-01-01T00:00:00Z',
     body: `Comment ${i + 1}: please ${'do it this way '.repeat(i === 0 ? 40 : 1)}`,
@@ -56,14 +64,14 @@ function setup() {
 
 const args = ['--reviews', 'reviews.jsonl', '--questions', 'questions.jsonl', '--answers', 'answers.jsonl', '--labels', 'labels.json', '--out', 'out/clusters.json'];
 
-test('ranks by count times severity, drops clusters under 3, and validates', () => {
+test('ranks by count times severity, drops clusters under 3 changes or 2 reviewers, and validates', () => {
   const dir = setup();
   const r = runNode('cluster.mjs', args, dir);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /12 reviewer comments = 2 labeled none \+ 10 kept/);
+  assert.match(r.stdout, /18 reviewer comments = 2 labeled none \+ 16 kept/);
   const out = JSON.parse(readFileSync(join(dir, 'out/clusters.json'), 'utf8'));
   assert.deepEqual(validate(loadSchema('cluster.clusters'), out), []);
-  assert.deepEqual(out.inputs, { reviews: 13, human_reviews: 12, conventions: 10, answered_by: { 'judgment-model': 12, agent: 12, human: 0 } });
+  assert.deepEqual(out.inputs, { reviews: 19, human_reviews: 18, conventions: 16, answered_by: { 'judgment-model': 18, agent: 18, human: 0 } });
   assert.deepEqual(
     out.clusters.map((c) => [c.rank, c.label, c.count, c.severity, c.score]),
     [
@@ -71,10 +79,17 @@ test('ranks by count times severity, drops clusters under 3, and validates', () 
       [2, 'many-minor', 5, 2, 10],
     ],
   );
-  assert.deepEqual(out.dropped, [{ label: 'pair', count: 2 }, { label: 'unused', count: 0 }]);
+  assert.deepEqual(out.min_count, { changes: 3, reviewers: 2 });
+  assert.deepEqual(out.dropped, [
+    { label: 'one-change', count: 3, changes: 1, reviewers: 2 },
+    { label: 'one-reviewer', count: 3, changes: 3, reviewers: 1 },
+    { label: 'pair', count: 2, changes: 2, reviewers: 2 },
+    { label: 'unused', count: 0, changes: 0, reviewers: 0 },
+  ]);
   const many = out.clusters[1];
   assert.deepEqual(many.review_ids, ['forge:1', 'forge:2', 'forge:3', 'forge:4', 'forge:5']);
   assert.deepEqual(many.changes, ['100', '101', '102']);
+  assert.deepEqual(many.reviewers, ['reviewer-0', 'reviewer-1']);
   assert.deepEqual(many.paths, ['src/a.js', 'src/b.js']);
   assert.deepEqual(many.examples.map((e) => e.review_id), ['forge:3', 'forge:1', 'forge:4', 'forge:2', 'forge:5']);
   assert.equal(many.examples[1].excerpt.length, 400);
