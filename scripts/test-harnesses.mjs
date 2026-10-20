@@ -86,11 +86,12 @@ export const HARNESSES = {
       mkdirSync(cfg, { mode: 0o700 });
       const token = process.env.CLAUDE_CODE_OAUTH_TOKEN;
       if (!token) writeFileSync(join(cfg, '.credentials.json'), `${this.creds}\n`, { mode: 0o600, flag: 'wx' });
-      // Claude Code installs through the marketplace; --plugin-dir loads the same plugin folder.
+      // Claude Code installs through the marketplace; --plugin-dir loads the same plugin folder. The menu needs only the
+      // skill and a file read, so no other tool is offered and no permission check is bypassed.
       return {
         cmd: 'claude',
         argv: ['-p', PROMPT, '--model', CLAUDE_MODEL, '--plugin-dir', join(repo, 'plugins/standards'),
-          '--permission-mode', 'bypassPermissions', '--max-turns', '8'],
+          '--tools', 'Skill,Read', '--max-turns', '8'],
         env: harnessEnv({ CLAUDE_CONFIG_DIR: cfg, ...(token ? { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' } : {}) }),
       };
     },

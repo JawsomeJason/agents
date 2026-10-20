@@ -104,6 +104,9 @@ test('the claude harness gets only the allowlisted environment and its own token
     assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, 'tok_FAKE');
     assert.equal(env.PATH, process.env.PATH);
     assert.equal(existsSync(join(tmp, 'claude/.credentials.json')), false, 'no login file with a token set');
+    const { argv } = HARNESSES.claude.setup(tempDir());
+    assert.deepEqual(argv.slice(argv.indexOf('--tools'), argv.indexOf('--tools') + 2), ['--tools', 'Skill,Read']);
+    assert.equal(argv.some((a) => /bypass/i.test(a)), false, 'no permission check is bypassed');
   } finally {
     for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
