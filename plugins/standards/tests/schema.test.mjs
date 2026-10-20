@@ -23,7 +23,7 @@ test('the validator rejects what each schema forbids', () => {
   ]);
 
   const questions = loadSchema('questions.questions');
-  const q = { id: 'forge:1#severity', review_id: 'forge:1', topic: 'severity', kind: 'score', prompt: 'p', state: 's', levels: ['low', 'high'] };
+  const q = { id: 'forge:1#severity', review_id: 'forge:1', topic: 'severity', kind: 'score', prompt: 'p', state: 's', levels: ['low', 'high'], level_descriptions: { low: 'l', high: 'h' } };
   assert.deepEqual(validate(questions, q), ['$.levels is not ["nit","minor","major","blocker"]']);
   assert.deepEqual(validate(questions, { ...q, levels: ['nit', 'minor', 'major', 'blocker'], options: ['a', 'b'] }), ['$ matches a not schema']);
 

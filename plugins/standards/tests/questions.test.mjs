@@ -54,6 +54,7 @@ test('ask writes three valid questions per reviewer comment and skips bots and t
   assert.equal(questions[1].option_descriptions['dto-at-boundary'], LABELS[0].description);
   assert.match(questions[1].option_descriptions.none, /none of the other conventions/);
   assert.deepEqual(questions[2].levels, ['nit', 'minor', 'major', 'blocker']);
+  assert.deepEqual(Object.keys(questions[2].level_descriptions), questions[2].levels);
   assert.equal(questions[0].state, 'Comment:\nComment forge:1\n\nPath: src/a.js\n\nDiff hunk:\n@@ -1 +1 @@\n-a\n+b');
   assert.match(questions[3].state, /^Comment:\nAddress review\n\nCommit diff:\n/);
 

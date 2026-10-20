@@ -10,6 +10,12 @@ const USAGE = [
 ].join('\n');
 export const LOW_CONFIDENCE = 0.6;
 export const SEVERITY_LEVELS = ['nit', 'minor', 'major', 'blocker'];
+const SEVERITY_DESCRIPTIONS = {
+  nit: 'Ignoring it leaves the code working and clear; it is a matter of taste.',
+  minor: 'Ignoring it makes the code harder to read, change or keep consistent, with no wrong behavior.',
+  major: 'Ignoring it causes wrong behavior in some cases, a confusing interface, or real maintenance cost.',
+  blocker: 'Ignoring it breaks the build, loses or corrupts data, opens a security hole, or ships a bug users hit.',
+};
 const ANSWERERS = ['judgment-model', 'agent', 'human'];
 const LABEL_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const NONE_DESCRIPTION = 'The comment enforces none of the other conventions, or no convention at all.';
@@ -93,7 +99,7 @@ export function ask(reviews, labels) {
     if (!isReviewerComment(review)) continue;
     const state = stateOf(review);
     const q = (topic, kind, extra) => ({ id: `${review.id}#${topic}`, review_id: review.id, topic, kind, prompt: PROMPTS[topic], state, ...extra });
-    questions.push(q('convention', 'yesno'), q('label', 'choice', { options, option_descriptions }), q('severity', 'score', { levels: SEVERITY_LEVELS }));
+    questions.push(q('convention', 'yesno'), q('label', 'choice', { options, option_descriptions }), q('severity', 'score', { levels: SEVERITY_LEVELS, level_descriptions: SEVERITY_DESCRIPTIONS }));
   }
   return questions;
 }
