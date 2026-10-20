@@ -108,7 +108,10 @@ function stage(argv) {
   const repoName = values['repo-name'] ?? repo;
   const split = readJson(join(data, 'split.json'));
   const standards = Object.fromEntries(arms.filter((a) => a !== 'none').map((a) => [a, resolve(values[`standards-${a.toLowerCase()}`])]));
-  const manifest = {};
+  // A run that stages some arms keeps the other arms' entries, so staging one arm later never orphans another's findings and tokens.
+  const manifestFile = join(data, 'review', 'manifest.json');
+  const previous = existsSync(manifestFile) ? readJson(manifestFile) : {};
+  const manifest = Object.fromEntries(Object.entries(previous).filter(([, m]) => !arms.includes(m.arm)));
   let missingSource = 0;
 
   for (const change of split.heldout) {
@@ -138,8 +141,8 @@ function stage(argv) {
       writeAtomic(join(data, 'review', arm, `${change.number}.prompt.md`), text);
     }
   }
-  writeJson(join(data, 'review', 'manifest.json'), manifest);
-  const sizes = Object.values(manifest).filter((m) => m.arm === 'none').map((m) => m.diff_chars).sort((a, b) => a - b);
+  writeJson(manifestFile, manifest);
+  const sizes = Object.values(manifest).filter((m) => m.arm === arms[0]).map((m) => m.diff_chars).sort((a, b) => a - b);
   console.log(`${Object.keys(manifest).length} workspaces under ${workspace}`);
   console.log(`diff chars: min ${sizes[0]}, median ${sizes[Math.floor(sizes.length / 2)]}, max ${sizes.at(-1)}; commits missing from clone: ${missingSource}`);
 }
