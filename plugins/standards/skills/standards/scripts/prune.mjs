@@ -826,11 +826,13 @@ export function verdicts(ctx, runs) {
   const ruleBy = new Map(ctx.rules.map((x) => [x.section, x]));
   const idOf = (r) => questionId(r, ruleBy.get(r.section), ctx.probes.get(r.section));
   for (const r of runs) questionsById.set(idOf(r), r);
+  // Answers about a harness out of scope for now stay valid for when it is back, so they are set aside, not problems.
+  const outOfScope = new Set(readRuns(out).filter((r) => ruleBy.has(r.section) && !ctx.activeNames.includes(r.harness)).map(idOf));
   const answered = new Map(); // grader -> Map(question id -> answer)
   const problems = [];
   for (const g of graders) {
     const file = graderFile(out, g, 'answers');
-    const { problems: p, answers } = checkAnswers([...questionsById.keys()].map((id) => ({ id })), readJsonl(file));
+    const { problems: p, answers } = checkAnswers([...questionsById.keys()].map((id) => ({ id })), readJsonl(file).filter((a) => !outOfScope.has(a.question_id)));
     problems.push(...p.map((x) => ({ grader: g, ...x })));
     answered.set(g, answers);
   }

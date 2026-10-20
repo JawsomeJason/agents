@@ -895,3 +895,18 @@ test('trial prints what the session loaded and warns when skills loaded', async 
   await trial(ctx, '§1.1', 'c');
   assert.deepEqual(logs.filter((l) => /^(loaded|warning):/.test(l)), ['loaded: skills someone-else; plugins none; mcp servers none', 'warning: the session loaded skills, so the no-rule arm may not be clean']);
 });
+
+test('answers about a harness skipped for now neither block finish nor get thrown away', async () => {
+  const fx = fixture();
+  const adapters = { fake: fakeAdapter(), other: fakeAdapter() };
+  const makeCtx = (o = {}) => createContext({
+    standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake', 'other'],
+    graders: ['a', 'b'], sections: ['§1.1'], 'prune-json': join(fx.out, 'prune.json'), log: () => {}, ...o,
+  }, adapters);
+  await runToDecision(fx, makeCtx);
+  const answers = readJsonl(join(fx.out, 'grading', 'a.answers.jsonl')).length;
+  const { record } = finish(makeCtx({ skip: ['other:login expired'] }));
+  assert.deepEqual(record.rules.map((r) => r.section), ['§1.1']);
+  assert.equal(readJsonl(join(fx.out, 'grading', 'a.answers.jsonl')).length, answers, 'the skipped harness keeps its answers');
+  assert.equal(finish(makeCtx()).record.provisional.startsWith('Decided'), false, 'with it back, its answers count again');
+});
