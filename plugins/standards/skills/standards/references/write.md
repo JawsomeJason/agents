@@ -40,7 +40,7 @@ Shape B is the option. Write one skill per area, named `<repo-slug>-standards-<a
 
 Use B only when the user asks for it, or when a shape experiment on this repo picked it. See "Shape experiment" below.
 
-Place the folder where the repo keeps its skills. When the repo has no skills folder, ask the user where it should go. The prefix `<repo-slug>` keeps the generated skill from sharing a name with this one.
+Place the folder where the repo keeps its skills. When the repo has no skills folder, ask the user where it should go. `<repo-slug>` is the repository's name without its owner, lowercased, with every run of other characters as one hyphen, such as `cli` for `cli/cli`. The prefix keeps the generated skill from sharing a name with this one.
 
 ## Step 4. Number the rules
 
