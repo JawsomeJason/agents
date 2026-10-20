@@ -13,10 +13,12 @@ const USAGE =
 
 const DIFF_BUDGET = 150000;
 const LOCKFILE = /(?:^|\/)(?:package-lock\.json|go\.sum|yarn\.lock|pnpm-lock\.yaml|Cargo\.lock|poetry\.lock)$/;
+// Generated code is rebuilt from a source the diff also changes, so no reviewer reads it line by line.
+const GENERATED = /(?:^|\/)__generated__\/|\.generated\.[cm]?[jt]sx?$|\.min\.[cm]?js$/;
 const TEST_FILE = /(?:_test\.go|\.test\.[cm]?[jt]sx?|_test\.py|(?:^|\/)(?:testdata|fixtures|tests?)\/)/;
 
 // Fits a large diff into a reviewer's context by a rule blind to where humans commented:
-// lockfiles go first, then whole files are kept in diff order, source before tests, while
+// lockfiles and generated code go first, then whole files are kept in diff order, source before tests, while
 // they fit the budget. Every omitted file is listed so the reviewer can read it from the clone.
 export function trimDiff(text, budget = DIFF_BUDGET) {
   if (text.length <= budget) return { text, omitted: [] };
@@ -25,7 +27,7 @@ export function trimDiff(text, budget = DIFF_BUDGET) {
   const kept = new Set();
   let used = 0;
   for (const f of order) {
-    if (LOCKFILE.test(f.path) || used + f.chunk.length > budget) continue;
+    if (LOCKFILE.test(f.path) || GENERATED.test(f.path) || used + f.chunk.length > budget) continue;
     kept.add(f);
     used += f.chunk.length;
   }
