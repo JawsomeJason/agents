@@ -23,6 +23,10 @@ Use it in this order:
 
 Run `doctor` now and then to catch drift.
 
+## Status
+
+The `review` pass showed no lift over a plain review in our tests on two repos, one of them `cli/cli`: reviewers given the standards did not beat a plain review at catching the human reviewers' convention comments. So the product is the writing rules, and `prune` is its measure: for each rule, how often agents follow it with and without being told. The first prune results ran on one harness and an uncalibrated grader, so every decision in them is provisional until more harnesses and human-labeled calibration confirm it.
+
 ## Install
 
 ### Claude Code
