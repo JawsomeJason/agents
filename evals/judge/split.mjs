@@ -272,4 +272,4 @@ function split(argv) {
   }
 }
 
-main(split, import.meta.url);
+main(split, import.meta.url, USAGE);

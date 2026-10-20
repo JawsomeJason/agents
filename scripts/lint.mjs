@@ -258,7 +258,16 @@ export function lint(target) {
   return errors;
 }
 
+const USAGE = `usage: node scripts/lint.mjs [folder]
+
+Lints this repo, or any folder of skills such as generated standards.
+Prints file:line rule message per problem and exits 1 when it finds any.`;
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log(USAGE);
+    process.exit(0);
+  }
   const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const errors = lint(process.argv[2] ?? defaultRoot);
   for (const e of errors) console.log(`${e.file}:${e.line} ${e.rule} ${e.message}`);

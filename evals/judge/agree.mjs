@@ -46,4 +46,4 @@ main((argv) => {
     return;
   }
   throw new JudgeError(USAGE);
-}, import.meta.url);
+}, import.meta.url, USAGE);

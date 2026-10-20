@@ -138,4 +138,4 @@ function stage(argv) {
   console.log(`diff chars: min ${sizes[0]}, median ${sizes[Math.floor(sizes.length / 2)]}, max ${sizes.at(-1)}; commits missing from clone: ${missingSource}`);
 }
 
-main(stage, import.meta.url);
+main(stage, import.meta.url, USAGE);

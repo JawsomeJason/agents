@@ -119,6 +119,10 @@ export function cluster({ reviews, questions, answers, labels }) {
 }
 
 function main(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log(USAGE);
+    return;
+  }
   let values;
   try {
     ({ values } = parseArgs({

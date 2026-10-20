@@ -25,6 +25,13 @@ const PROMPT =
   'Do not run any other command and do not change any file.';
 
 const args = process.argv.slice(2);
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`usage: node scripts/test-harnesses.mjs [--harness claude,codex,opencode] [--keep]
+
+Runs the standards skill with no argument in each installed harness and checks the reply
+holds its menu. Needs each harness's login and spends real quota. --keep leaves the temp homes.`);
+  process.exit(0);
+}
 const keep = args.includes('--keep');
 const hIdx = args.indexOf('--harness');
 const only = hIdx >= 0 ? args[hIdx + 1].split(',') : null;

@@ -154,6 +154,10 @@ function required(values, names) {
 }
 
 function main(argv) {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    console.log(USAGE);
+    return 0;
+  }
   const [command, ...rest] = argv;
   let values;
   try {

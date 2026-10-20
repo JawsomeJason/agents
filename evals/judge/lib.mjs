@@ -68,8 +68,12 @@ export function seededShuffle(items, seed) {
 }
 
 // Runs fn only when the file at metaUrl is the script node was started with, so tests can import it.
-export function main(fn, metaUrl) {
+export function main(fn, metaUrl, usage) {
   if (process.argv[1] !== fileURLToPath(metaUrl)) return;
+  if (process.argv.includes('--help') || process.argv.includes('-h')) {
+    console.log(usage);
+    return;
+  }
   try {
     fn(process.argv.slice(2));
   } catch (e) {
