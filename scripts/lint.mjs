@@ -237,13 +237,17 @@ function lintMarketplace(root, report) {
   const onDisk = existsSync(pluginsDir)
     ? readdirSync(pluginsDir).filter((d) => statSync(join(pluginsDir, d)).isDirectory()).sort()
     : [];
-  const listed = (manifest.plugins ?? []).map((p) => p.source?.replace(/^\.\/plugins\//, '').replace(/\/$/, ''));
+  // A source may also be an object naming a remote repo, which no plugins/* folder backs.
+  const dirOf = (p) => (typeof p.source === 'string' ? p.source.replace(/^\.\/plugins\//, '').replace(/\/$/, '') : null);
+  const listed = (manifest.plugins ?? []).map(dirOf);
   for (const dir of onDisk.filter((d) => !listed.includes(d))) {
     report(file, 1, 'marketplace-plugins', `plugins/${dir} is not listed`);
   }
   for (const entry of manifest.plugins ?? []) {
-    const dir = entry.source?.replace(/^\.\/plugins\//, '').replace(/\/$/, '');
-    if (!onDisk.includes(dir)) {
+    const dir = dirOf(entry);
+    if (dir === null) {
+      report(file, 1, 'marketplace-plugins', `"${entry.name}" has a source that is not a ./plugins/* path; this repo lists only its own plugins`);
+    } else if (!onDisk.includes(dir)) {
       report(file, 1, 'marketplace-plugins', `"${entry.name}" source "${entry.source}" is not a plugins/* directory`);
     }
   }

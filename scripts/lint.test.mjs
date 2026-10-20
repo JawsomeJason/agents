@@ -25,6 +25,7 @@ const expected = {
   'link-escape': 'link-escape',
   'link-space': 'link-broken',
   'marketplace-plugins': 'marketplace-plugins',
+  'marketplace-source-object': 'marketplace-plugins',
   'model-name': 'model-name',
   'name-dir': 'name-dir',
   'name-format': 'name-format',
