@@ -77,15 +77,32 @@ function parseFrontmatter(text) {
   return { fields, bodyStartLine: end + 2, body: lines.slice(end + 1).join('\n') };
 }
 
+/**
+ * Marks each line as a fence opener, a fence closer, inside a fence, or prose. A fence closes only on a line of
+ * its own marker character at least as long as the opener, so a ``` line inside a ```` fence stays code.
+ */
+function fenceStates(lines) {
+  let open = null;
+  return lines.map((line) => {
+    const m = /^\s*(`{3,}|~{3,})(.*)$/.exec(line);
+    if (!open) {
+      if (!m) return 'prose';
+      open = m[1];
+      return 'open';
+    }
+    if (m && m[1][0] === open[0] && m[1].length >= open.length && !m[2].trim()) {
+      open = null;
+      return 'close';
+    }
+    return 'code';
+  });
+}
+
 function maskCode(text, maskInline) {
   const lines = text.split('\n');
-  let inFence = false;
-  return lines.map((line) => {
-    if (/^\s*(```|~~~)/.test(line)) {
-      inFence = !inFence;
-      return '';
-    }
-    if (inFence) return '';
+  const states = fenceStates(lines);
+  return lines.map((line, i) => {
+    if (states[i] !== 'prose') return '';
     return maskInline ? line.replace(/`[^`]*`/g, (m) => ' '.repeat(m.length)) : line;
   });
 }
@@ -180,19 +197,14 @@ function lintSkill(skillDir, report) {
     }
   }
 
-  const lines = text.split('\n');
   let fenceStart = -1;
-  lines.forEach((line, i) => {
-    if (!/^\s*(```|~~~)/.test(line)) return;
-    if (fenceStart === -1) {
-      fenceStart = i;
-      return;
-    }
+  fenceStates(text.split('\n')).forEach((state, i) => {
+    if (state === 'open') fenceStart = i;
+    if (state !== 'close') return;
     const length = i - fenceStart - 1;
     if (length > spec.fenceMaxLines) {
       report(skillFile, fenceStart + 1, 'fence-length', `code block runs ${length} lines, max ${spec.fenceMaxLines}; move it to references/`);
     }
-    fenceStart = -1;
   });
 
   // Standards generated for one repo describe that repo, so they may name the services it runs on.

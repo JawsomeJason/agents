@@ -40,7 +40,7 @@ const expected = {
   'vendor-name': 'vendor-name',
 };
 
-const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term'];
+const passing = ['clean', 'doc-allow', 'extension-key-allowed', 'generated-quote-allowed', 'generated-vendor-allowed', 'link-placeholder', 'private-term', 'fence-nested'];
 
 test('every fixture directory has an expectation', () => {
   const dirs = readdirSync(fileURLToPath(new URL('./lint-fixtures', import.meta.url))).filter((d) => !passing.includes(d));
@@ -104,4 +104,8 @@ test('a private denylist named by STANDARDS_LINT_PRIVATE_DENYLIST adds its terms
   const missing = spawnSync(process.execPath, [cli, target], { encoding: 'utf8', env: { ...process.env, STANDARDS_LINT_PRIVATE_DENYLIST: `${target}/nope.json` } });
   assert.notEqual(missing.status, 0, 'a named list that cannot be read fails instead of passing silently');
   assert.match(missing.stderr, /STANDARDS_LINT_PRIVATE_DENYLIST=.*nope\.json is not a readable JSON file/);
+});
+
+test('a ``` line inside a ```` fence stays code, so a time word there passes', () => {
+  assert.deepEqual(lint(fixture('fence-nested')), []);
 });
