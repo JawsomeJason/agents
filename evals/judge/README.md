@@ -24,6 +24,16 @@ Run from anywhere. `$D` is the data folder for one repo and `$S` is `plugins/sta
    3. `node grade.mjs calibrate --data $D` samples 30 pairs into `grade/calibration.json`; label each `same_concern` by hand and rerun it for the consensus's agreement with the hand labels. Pass `--answers` to calibrate one grader's file on its own. `calibrate` writes `grade/calibration.result.json` for whichever file it was given, so copy it aside before calibrating another.
 10. **Score.** `node grade.mjs score --data $D` writes `grade/metrics.json` and `grade/metrics.md`: convention recall, all-comment recall, false positives per change and mean tokens, per arm.
 
+## Lens pass
+
+`lens.mjs` tests whether a reviewer misses rules because it forgets to apply them. It asks one yes/no question for every pair of a § in a standards skill and an added hunk in a file that §'s Applies-to globs match, so every rule meets every hunk it covers.
+
+1. `node lens.mjs ask --standards $D/standards-A/<skill> --diffs $D/heldout/diffs --split $D/split.json --out $L/questions.jsonl` reads the diffs `stage.mjs` gave the reviewers. Each pair gets a `#violates` yes/no question, plus a `#line` choice of the added line that shows it and a `#heuristic` choice of the sign that fires. The three share the hunk as their state, so an answerer that groups by state reads each hunk once. A hunk that adds more than 40 lines is cut into pieces.
+2. Answer the file with a judgment model, or with an agent. An agent may answer only the `#violates` questions.
+3. `node lens.mjs collect --questions $L/questions.jsonl --answers <answers> --split $D/split.json --out $L/review/lens --threshold 0.5` writes one findings file per change. A yes becomes a finding at the chosen line, or at the hunk's first added line when no line was chosen, citing the §.
+4. `node lens.mjs union --a $L/review/none --b $L/review/lens --split $D/split.json --out $L/review/union` models a free-form review followed by the lens pass.
+5. Grade with `grade.mjs pairs --data $L --arms none,lens,union`, then the usual consensus and score. `--arms` names the folders under `review/` to grade, and `score` reads the same list from `pairs.meta.json`.
+
 ## What the numbers mean
 
 - A human comment is a convention comment when its label is not `none`, the same rule `cluster.mjs` applies.

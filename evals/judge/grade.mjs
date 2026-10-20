@@ -11,7 +11,7 @@ import { ARMS, JudgeError, args, main, need, readJson, readJsonl, seededShuffle,
 
 const USAGE = [
   'usage: grade.mjs collect --data <dir>',
-  '       grade.mjs pairs --data <dir> [--window 10]',
+  '       grade.mjs pairs --data <dir> [--window 10] [--arms none,A,B]',
   '       grade.mjs consensus --data <dir> [--first <answers>] [--second <answers>] [--third <answers>]',
   '       grade.mjs calibrate --data <dir> [--answers <pairs answers>] [--n 30] [--seed 7]',
   '       grade.mjs score --data <dir> [--answers <pairs answers>] [--threshold 0.5]',
@@ -57,9 +57,9 @@ function collect(data) {
   }
 }
 
-function loadFindings(data, split) {
+function loadFindings(data, split, arms) {
   const out = {};
-  for (const arm of ARMS) {
+  for (const arm of arms) {
     out[arm] = {};
     for (const c of split.heldout) {
       const file = join(data, 'review', arm, `${c.number}.json`);
@@ -70,12 +70,12 @@ function loadFindings(data, split) {
   return out;
 }
 
-function candidatePairs(data, window) {
+function candidatePairs(data, window, arms) {
   const split = readJson(join(data, 'split.json'));
   const comments = readJsonl(join(data, 'heldout', 'reviews.jsonl'));
-  const findings = loadFindings(data, split);
+  const findings = loadFindings(data, split, arms);
   const pairs = [];
-  for (const arm of ARMS) {
+  for (const arm of arms) {
     for (const c of split.heldout) {
       findings[arm][c.number].forEach((f, i) => {
         for (const h of comments.filter((x) => x.change === c.number && normPath(x.path) === f.file)) {
@@ -92,10 +92,10 @@ function candidatePairs(data, window) {
   return { split, comments, findings, pairs };
 }
 
-function pairs(data, window) {
-  const { pairs: rows } = candidatePairs(data, window);
+function pairs(data, window, arms) {
+  const { pairs: rows } = candidatePairs(data, window, arms);
   writeJsonl(join(data, 'grade', 'pairs.questions.jsonl'), rows);
-  const byArm = Object.fromEntries(ARMS.map((a) => [a, rows.filter((p) => p.arm === a).length]));
+  const byArm = Object.fromEntries(arms.map((a) => [a, rows.filter((p) => p.arm === a).length]));
   console.log(`${rows.length} candidate pairs within ${window} lines: ${JSON.stringify(byArm)}`);
 }
 
@@ -194,7 +194,9 @@ function conventionFlags(data) {
 }
 
 function score(data, answersFile, threshold) {
-  const { split, comments, findings, pairs: rows } = candidatePairs(data, readJson(join(data, 'grade', 'pairs.meta.json')).window);
+  const meta = readJson(join(data, 'grade', 'pairs.meta.json'));
+  const arms = meta.arms ?? ARMS;
+  const { split, comments, findings, pairs: rows } = candidatePairs(data, meta.window, arms);
   const answers = readAnswers(answersFile);
   const flag = conventionFlags(data);
   const manifest = readJson(join(data, 'review', 'manifest.json'));
@@ -204,7 +206,7 @@ function score(data, answersFile, threshold) {
   const changes = split.heldout.length;
   const table = {};
   const perChange = {};
-  for (const arm of ARMS) {
+  for (const arm of arms) {
     const matches = rows.filter((p) => p.arm === arm && says(answers.get(p.id) ?? missingAnswer(p.id), threshold));
     const caught = new Set(matches.map((p) => p.comment));
     const backed = new Set(matches.map((p) => `${p.change}/${p.finding}`));
@@ -235,7 +237,7 @@ function score(data, answersFile, threshold) {
   const md = [
     `| Arm | Convention recall (of ${conv.size}) | All recall (of ${comments.length}) | False positives per change | Findings | Mean tokens |`,
     '| --- | --- | --- | --- | --- | --- |',
-    ...ARMS.map((a) => row(a, table[a])),
+    ...arms.map((a) => row(a, table[a])),
   ].join('\n');
   writeAtomic(join(data, 'grade', 'metrics.md'), md + '\n');
   console.log(md);
@@ -251,7 +253,7 @@ main((argv) => {
   const [command, ...rest] = argv;
   const { values } = args(
     rest,
-    { data: { type: 'string' }, window: { type: 'string', default: '10' }, answers: { type: 'string' }, first: { type: 'string' }, second: { type: 'string' }, third: { type: 'string' }, n: { type: 'string', default: '30' }, seed: { type: 'string', default: '7' }, threshold: { type: 'string', default: '0.5' } },
+    { data: { type: 'string' }, window: { type: 'string', default: '10' }, arms: { type: 'string', default: ARMS.join(',') }, answers: { type: 'string' }, first: { type: 'string' }, second: { type: 'string' }, third: { type: 'string' }, n: { type: 'string', default: '30' }, seed: { type: 'string', default: '7' }, threshold: { type: 'string', default: '0.5' } },
     USAGE,
   );
   need(values, ['data'], USAGE);
@@ -259,8 +261,9 @@ main((argv) => {
   const answersFile = resolve(values.answers ?? join(data, 'grade', 'pairs.answers.jsonl'));
   if (command === 'collect') return collect(data);
   if (command === 'pairs') {
-    writeJson(join(data, 'grade', 'pairs.meta.json'), { window: Number(values.window), prompt: SAME_CONCERN });
-    return pairs(data, Number(values.window));
+    const arms = values.arms.split(',').filter(Boolean);
+    writeJson(join(data, 'grade', 'pairs.meta.json'), { window: Number(values.window), arms, prompt: SAME_CONCERN });
+    return pairs(data, Number(values.window), arms);
   }
   if (command === 'consensus') {
     const file = (k, name) => resolve(values[k] ?? join(data, 'grade', name));
