@@ -65,7 +65,7 @@ function prompt({ dir, repoName, commit, arm }) {
   ];
   if (arm !== 'none') {
     lines.push(
-      `- The repository's coding standards are installed as skills in ${dir}/skills/. Review the change with the standards skill's review command: read ${dir}/skills/standards/SKILL.md and follow its review reference. Use change.diff as the diff, and the standards skills under ${dir}/skills/ as the standards.`,
+      `- The repository's coding standards are installed as skills in ${dir}/skills/. First review the change the ordinary way, as the paragraph below asks, and keep every finding from that review. Then add a standards pass on top with the standards skill's review command: read ${dir}/skills/standards/SKILL.md and follow its review reference. Use change.diff as the diff, and the standards skills under ${dir}/skills/ as the standards. The standards pass only adds findings; it never replaces or shrinks the ordinary review.`,
     );
   }
   lines.push(
