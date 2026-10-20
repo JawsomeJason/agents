@@ -273,7 +273,7 @@ const CRITERIA = {
 export function trimDiff(diff, max = QUESTION_DIFF_MAX) {
   if (diff.length <= max) return diff;
   const files = diff.split(/^(?=diff --git )/m);
-  const weight = (f) => (/^diff --git a\/\S*_test\.go /.test(f) ? 1 : 0);
+  const weight = (f) => (TEST_FILE.test(/^diff --git a\/(\S+)/.exec(f)?.[1] ?? '') ? 1 : 0);
   const ordered = [...files].sort((x, y) => weight(x) - weight(y));
   let out = '';
   let dropped = 0;

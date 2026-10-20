@@ -98,6 +98,15 @@ test('trimDiff drops test files before source files and says what it left out', 
   assert.equal(trimDiff(src, 1000), src);
 });
 
+test('trimDiff drops test files of any language first', () => {
+  const src = `diff --git a/lib/a.py b/lib/a.py\n${'+x\n'.repeat(10)}`;
+  for (const t of ['tests/test_a.py', 'src/a.test.ts', 'spec/a.spec.rb']) {
+    const tst = `diff --git a/${t} b/${t}\n${'+y\n'.repeat(10)}`;
+    const out = trimDiff(tst + src, src.length + 40);
+    assert.ok(out.includes('lib/a.py') && !out.includes(t), t);
+  }
+});
+
 test('checkAnswers rejects what the answers schema forbids', () => {
   const qs = [{ id: 'aaaaaaaaaaaa#complies' }];
   const good = { question_id: 'aaaaaaaaaaaa#complies', answer: true, confidence: 0.8, answered_by: 'agent' };
