@@ -1,6 +1,8 @@
 # review
 
-Applies every lens a diff triggers and reports each confirmed violation with its § cited. A finding that names its § lets the author read the rule, the why and the evidence before arguing with it.
+Adds a standards pass on top of an ordinary review: applies every lens a diff triggers and reports each confirmed violation with its § cited. A finding that names its § lets the author read the rule, the why and the evidence before arguing with it.
+
+The pass never replaces the ordinary review. When it stood in for one, reviewers raised mostly § findings and missed real bugs and behavior problems that a plain review caught.
 
 Run from the target repo's root. No script covers this command, because matching a heuristic to code is a judgment.
 
@@ -21,6 +23,8 @@ Pick the diff from the request:
 Find the default branch with `git symbolic-ref refs/remotes/origin/HEAD`, and ask the user when that fails. Guessing the branch name diffs against the wrong base.
 
 When you wrote the diff yourself, spawn a fresh subagent to run steps 2 to 5. An author reads intent into code that a reader would not see.
+
+Then review the diff the ordinary way first, before opening any standards: bugs, behavior, design, tests and anything else a careful maintainer would raise. Skip this only when an ordinary review of this diff already exists, such as one the user supplied or one already in the reply. Keep those findings whole. The standards pass that follows only adds findings, because a reviewer primed with lenses stops looking for anything else.
 
 ## Step 2. Find the standards
 
@@ -52,7 +56,9 @@ Done when every candidate is either confirmed or dropped against its bar.
 
 Anchor each finding on the line the fix changes, such as the declaration of the function, parameter, type or name to change, rather than a line where the symptom shows. When the fix reaches other lines, name those call sites in the message. An author fixes the line a finding points at, so a finding on the symptom gets the symptom patched.
 
-Write one line per finding, sorted by severity, blockers first, nits last:
+Report the ordinary review's findings first, unchanged: never drop, merge away or shorten one because the standards pass covers the same line. When a § finding and an ordinary finding name the same problem, keep the ordinary one and add the § to it.
+
+Then list the standards pass's findings under a heading `Standards pass`, so the reader can tell them apart. Write one line per finding, sorted by severity, blockers first, nits last:
 
 ```text
 §3.1 major src/api/users.ts:42 The handler returns the database document, so internal fields reach the client. Map it to a response DTO first.
