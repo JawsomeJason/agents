@@ -60,7 +60,7 @@ Done when every reviewer comment has exactly two questions.
 
 Output `.standards/answers.jsonl`, per [the answers schema](schemas/questions.answers.schema.json).
 
-A judgment model is a fast model that answers typed questions (pick one of a set, a yes/no probability, a score) with calibrated probabilities. If your environment gives you a judgment model, answer the questions file with it; otherwise answer them yourself.
+If your environment gives you a judgment model, as [SKILL.md](../SKILL.md#judgment-model) defines it, answer the questions file with it; otherwise answer them yourself.
 
 - Send a comment's two questions in one request when the judgment model accepts several, because they share one state.
 - Record the model's ID in `model` and set `answered_by` to `judgment-model`.

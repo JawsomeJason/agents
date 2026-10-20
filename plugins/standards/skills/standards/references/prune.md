@@ -57,7 +57,7 @@ Run the arms `none`, `one-liner` and `full` in every harness that is not skipped
 
 Ask one yes/no question per output: "Does this output follow <rule>?", with the rule's one-liner in place of `<rule>`, and the § file and the output's diff as the state.
 
-A judgment model is a fast model that answers typed questions (pick one of a set, a yes/no probability, a score) with calibrated probabilities. If your environment gives you a judgment model, grade with it; otherwise use the fallback grader below.
+If your environment gives you a judgment model, as [SKILL.md](../SKILL.md#judgment-model) defines it, grade with it; otherwise use the fallback grader below.
 
 `step` writes `grading/<grader>.questions.jsonl` for each grader, in the same questions and answers pattern `mine` uses, per [the questions schema](schemas/prune.questions.schema.json). Each is one yes/no question with an opaque id, so a grader cannot tell the arm or the harness. The id hashes the run's slot with its diff, the § text and the probe, so a redone run, an edited § or a rewritten probe asks a new question instead of keeping a verdict on output that is gone. `status` lists an answer whose question is gone; delete it before `finish`, which refuses while any answer has a problem. Write the answers to `grading/<grader>.answers.jsonl` per [the answers schema](schemas/prune.answers.schema.json). Rerunning `step` reads them.
 
