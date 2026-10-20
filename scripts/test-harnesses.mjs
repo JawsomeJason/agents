@@ -8,7 +8,7 @@
 //
 // Needs real auth and spends real quota, so it stays out of CI. Run it before each release.
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync, chmodSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 
@@ -55,6 +55,15 @@ function cleanEnv(extra) {
     'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME'];
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !drop.includes(k)));
   return { ...env, ...extra };
+}
+
+// A bare temp home has no keychain, so the OS asks the user to reset one whenever a harness stores its
+// login. Linking the real keychain folder keeps the home isolated and the token writes silent.
+function tempHome(dir) {
+  mkdirSync(join(dir, 'Library'), { recursive: true });
+  const keychains = join(HOME, 'Library/Keychains');
+  if (existsSync(keychains)) symlinkSync(keychains, join(dir, 'Library/Keychains'));
+  return dir;
 }
 
 function install(harness, env) {
@@ -112,7 +121,7 @@ const HARNESSES = {
       mkdirSync(codexHome);
       copyFileSync(join(HOME, '.codex/auth.json'), join(codexHome, 'auth.json'));
       const env = cleanEnv({ HOME: join(tmp, 'home'), CODEX_HOME: codexHome });
-      mkdirSync(env.HOME);
+      tempHome(env.HOME);
       install('codex', env);
       // stdin stays closed: codex exec waits on an open stdin.
       return {
@@ -138,6 +147,7 @@ const HARNESSES = {
         mkdirSync(d, { recursive: true });
       }
       copyFileSync(join(HOME, '.local/share/opencode/auth.json'), join(env.XDG_DATA_HOME, 'opencode/auth.json'));
+      tempHome(env.HOME);
       install('opencode', env);
       return { cmd: 'opencode', argv: ['run', '--standalone', '-m', OPENCODE_MODEL, PROMPT], env };
     },

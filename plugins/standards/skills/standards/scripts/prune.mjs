@@ -3,7 +3,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync,
-  writeFileSync,
+  symlinkSync, writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
@@ -371,6 +371,15 @@ function cleanEnv(extra) {
   return { ...env, ...extra };
 }
 
+// A bare temp home has no keychain, so the OS asks the user to reset one whenever a harness stores its
+// login. Linking the real keychain folder keeps the home isolated and the token writes silent.
+function tempHome(dir) {
+  mkdirSync(join(dir, 'Library'), { recursive: true });
+  const keychains = join(HOME, 'Library/Keychains');
+  if (existsSync(keychains)) symlinkSync(keychains, join(dir, 'Library/Keychains'));
+  return dir;
+}
+
 function onPath(bin) {
   return (process.env.PATH ?? '').split(':').some((d) => d && existsSync(join(d, bin)));
 }
@@ -406,7 +415,7 @@ export const ADAPTERS = {
     prepare({ tmp, wt, prompt, writable, model }) {
       const codexHome = join(tmp, 'codex');
       mkdirSync(codexHome);
-      mkdirSync(join(tmp, 'home'));
+      tempHome(join(tmp, 'home'));
       copyFileSync(join(HOME, '.codex/auth.json'), join(codexHome, 'auth.json'));
       const add = writable.flatMap((d) => ['--add-dir', d]);
       return { argv: ['exec', '--json', '-s', 'workspace-write', '-C', wt, ...(model ? ['-m', model] : []), ...add, prompt], env: { HOME: join(tmp, 'home'), CODEX_HOME: codexHome } };
@@ -429,6 +438,7 @@ export const ADAPTERS = {
       const dirs = { home: join(tmp, 'home'), config: join(tmp, 'config'), data: join(tmp, 'data'), cache: join(tmp, 'cache'), state: join(tmp, 'state') };
       for (const d of [dirs.home, join(dirs.config, 'opencode'), join(dirs.data, 'opencode'), join(dirs.cache, 'opencode'), dirs.state]) mkdirSync(d, { recursive: true });
       copyFileSync(join(HOME, '.local/share/opencode/auth.json'), join(dirs.data, 'opencode/auth.json'));
+      tempHome(dirs.home);
       return {
         argv: ['run', '--standalone', '--auto', '--format', 'json', '-m', model ?? ADAPTERS.opencode.model(), prompt],
         env: { HOME: dirs.home, XDG_CONFIG_HOME: dirs.config, XDG_DATA_HOME: dirs.data, XDG_CACHE_HOME: dirs.cache, XDG_STATE_HOME: dirs.state },
@@ -449,9 +459,11 @@ export const ADAPTERS = {
       return creds ? null : 'not logged in (no stored credentials)';
     },
     prepare({ tmp, prompt, model }) {
-      const cfg = join(tmp, 'claude');
-      mkdirSync(cfg);
-      mkdirSync(join(tmp, 'home'));
+      // One config folder for every run: the harness keys its stored login by this path, so a folder per run
+      // would leave one keychain entry per run behind.
+      const cfg = join(tmpdir(), 'standards-prune-claude');
+      mkdirSync(cfg, { recursive: true });
+      tempHome(join(tmp, 'home'));
       writeFileSync(join(cfg, '.credentials.json'), `${ADAPTERS.claude.creds}\n`, { mode: 0o600 });
       return { argv: ['-p', prompt, '--permission-mode', 'bypassPermissions', '--output-format', 'json', ...(model ? ['--model', model] : [])], env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg } };
     },
