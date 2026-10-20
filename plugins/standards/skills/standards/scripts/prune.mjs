@@ -56,7 +56,7 @@ const RULE_ARMS = ['one-liner', 'full'];
 const MAX_FAILURES_PER_CELL = 8;
 const MAX_THROTTLES_PER_RUN = 3;
 // A provider that refuses work for lack of quota says so on a failed exit; the agent's own prose never sets the exit code.
-const THROTTLED = /"status":\s*429|rate limit|usage limit|provider\.quota|too many requests/i;
+const THROTTLED = /"status":\s*429|\b429\b|rate[ _]limit|usage limit|provider\.quota|too many requests/i;
 const DIFF_STORE_MAX = 1_000_000;
 const QUESTION_DIFF_MAX = 45_000;
 const OUTPUT_LOG_MAX = 300_000;
@@ -601,6 +601,11 @@ export const ADAPTERS = {
         env: { HOME: join(tmp, 'home'), CLAUDE_CONFIG_DIR: cfg, ...auth },
       };
     },
+    // The final result event says whether the session ended on an API error; the events before it are the transcript.
+    errorText(stdout) {
+      const doc = jsonLines(stdout).findLast((e) => e.type === 'result');
+      return doc?.is_error ? `${doc.api_error_status ?? ''} ${doc.result ?? ''}` : '';
+    },
     collect({ stdout }) {
       const events = jsonLines(stdout);
       const init = events.find((e) => e.type === 'system' && e.subtype === 'init');
@@ -672,6 +677,10 @@ const locked = (fn) => {
   return next;
 };
 
+// The error events a JSON event stream ends a failed session with, such as codex's `error` and `turn.failed`.
+// Tool, text and message events are the transcript and stay out.
+const errorEvents = (stdout) => jsonLines(stdout).filter((e) => /error|fail/i.test(String(e.type ?? ''))).map((e) => JSON.stringify(e)).join('\n');
+
 const tail = (res) => {
   const t = (res.stderr.trim() || res.stdout.trim()).split('\n').slice(-3).join(' ').slice(-240);
   return t ? `: ${t}` : '';
@@ -715,12 +724,14 @@ export async function executeRun(ctx, harness, rule, arm, runNumber, { dest }) {
     const { argv, env } = harness.adapter.prepare({ tmp, scratch: ctx.scratch.dir, wt, prompt, writable, model: pinned });
     // Some harnesses take their working directory from $PWD, which a spawn does not update.
     const res = await spawnGuarded(harness.adapter.command, argv, { cwd: wt, env: harnessEnv({ ...ctx.env, ...env, PWD: wt }), timeoutMs: ctx.timeoutMs, track: ctx.scratch.track });
-    if (res.code !== 0 && THROTTLED.test(`${res.stdout}\n${res.stderr}`)) return { failed: `throttled${tail(res)}`, throttled: true, log: `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX) };
+    const log = `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX);
+    if (res.timedOut) return { failed: `timed out after ${Math.round(ctx.timeoutMs / 60000)} minutes`, log };
+    // Only the harness's own error counts: stdout carries the transcript, which quotes whatever the repo's files say.
+    const errorText = `${res.stderr}\n${(harness.adapter.errorText ?? errorEvents)(res.stdout)}`;
+    if (res.code !== 0 && THROTTLED.test(errorText)) return { failed: `throttled: ${errorText.trim().split('\n').slice(-3).join(' ').slice(-240)}`, throttled: true, log };
     const { diff, files } = captureDiff(wt, ctx.head, ctx.standardsRel);
     const got = harness.adapter.collect({ tmp, stdout: res.stdout, stderr: res.stderr, model: pinned });
     const finished = new Date();
-    const log = `${res.stdout}\n--- stderr ---\n${res.stderr}`.slice(0, OUTPUT_LOG_MAX);
-    if (res.timedOut) return { failed: `timed out after ${Math.round(ctx.timeoutMs / 60000)} minutes`, log };
     if (!files.length) return { failed: `no changes (exit ${res.code})${tail(res)}`, log };
     if (res.code !== 0 && !got.message) return { failed: `exit ${res.code} with no message${tail(res)}`, log };
     mkdirSync(dest, { recursive: true });
@@ -984,7 +995,7 @@ export async function step(ctx) {
     }
     if (st.pending) waiting.push(rule.section);
     for (const n of st.needs) {
-      const failedHere = failures.filter((f) => f.kind !== 'throttled' && !THROTTLED.test(f.reason ?? '') && f.section === rule.section && f.harness === n.harness && f.arm === n.arm).length;
+      const failedHere = failures.filter((f) => f.kind !== 'throttled' && f.section === rule.section && f.harness === n.harness && f.arm === n.arm).length;
       if (failedHere >= MAX_FAILURES_PER_CELL) {
         ctx.log(`${rule.section} ${n.harness} ${n.arm}: ${failedHere} failed attempts, not retrying; see failures.jsonl`);
         continue;

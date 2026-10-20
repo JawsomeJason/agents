@@ -428,7 +428,7 @@ test('a provider that keeps refusing halts its harness and the step ends', async
   const adapter = fakeAdapter();
   const ok = adapter.prepare;
   let calls = 0;
-  adapter.prepare = (a) => (++calls <= 99 ? { argv: ['-c', 'echo \'{"status":429,"message":"Rate limit exceeded"}\'; exit 1'], env: {} } : ok(a));
+  adapter.prepare = (a) => (++calls <= 99 ? { argv: ['-c', 'echo \'{"type":"error","status":429,"message":"Rate limit exceeded"}\'; exit 1'], env: {} } : ok(a));
   const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['fake'], graders: ['a'], sections: ['§1.1'], concurrency: 1, 'backoff-sec': '0', log: () => {} }, { fake: adapter });
   ctx.backoffMs = 0;
   await step(ctx);
@@ -438,6 +438,32 @@ test('a provider that keeps refusing halts its harness and the step ends', async
   assert.ok(ctx.halted.has('fake'));
   assert.equal(readRuns(fx.out).length, 0, 'a halted harness runs nothing more');
 });
+
+/** A claude-shaped agent whose transcript quotes a repo file that mentions a rate limit, then ends with tail. */
+function quotingAgent(tail) {
+  const event = JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result', content: 'api/client.go: return fmt.Errorf("API rate limit exceeded")' }] } });
+  return {
+    command: 'sh',
+    auth: () => null,
+    prepare: ({ wt }) => ({ argv: ['-c', `printf '%s\\n' '${event}'; echo x >> ${wt}/main.txt; ${tail}`], env: {} }),
+    errorText: prune.ADAPTERS.claude.errorText,
+    collect: prune.ADAPTERS.claude.collect,
+  };
+}
+
+for (const [how, tail, timeoutMs, want] of [
+  ['exits 1', 'exit 1', null, /^exit 1 with no message/],
+  ['times out', 'sleep 5', 300, /^timed out after/],
+  ['ends on a 429 result', `echo '{"type":"result","is_error":true,"api_error_status":429,"result":"API Error: 429 rate_limit_error"}'; exit 1`, null, /^throttled: .*429/],
+]) {
+  test(`a claude run whose transcript quotes "rate limit" and ${how} is ${String(want).includes('throttled') ? '' : 'not '}throttled`, async () => {
+    const fx = fixture();
+    const ctx = createContext({ standards: fx.standards, repo: fx.repo, out: fx.out, probes: fx.probes, harnesses: ['c'], graders: ['a'], log: () => {} }, { c: quotingAgent(tail) });
+    if (timeoutMs) ctx.timeoutMs = timeoutMs;
+    const r = await trial(ctx, '§1.1', 'c');
+    assert.match(r.failed, want);
+  });
+}
 
 test('questions writes the grading files for the runs on disk and runs nothing', async () => {
   const fx = fixture();
