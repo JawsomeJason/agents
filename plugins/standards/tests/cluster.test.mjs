@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { readJsonl, runNode, tempDir, writeJsonl } from './helpers.mjs';
 import { loadSchema, validate } from './schema.mjs';
+import { labelTag } from '../skills/standards/scripts/questions.mjs';
 
 const LABELS = [
   { id: 'many-minor', description: 'A frequent, low-harm convention.' },
@@ -13,6 +14,7 @@ const LABELS = [
   { id: 'one-change', description: 'Three comments, all on one change.' },
   { id: 'one-reviewer', description: 'Three changes, all from one reviewer.' },
 ];
+const TAG = labelTag(LABELS);
 
 // label, severity, label confidence, and optionally the change and reviewer
 const PLAN = [
@@ -55,7 +57,7 @@ function setup() {
   const ask = runNode('questions.mjs', ['ask', '--reviews', 'reviews.jsonl', '--labels', 'labels.json', '--out', 'questions.jsonl'], dir);
   assert.equal(ask.status, 0, ask.stderr);
   const answers = PLAN.flatMap(([label, severity, labelConfidence], i) => [
-    { question_id: `forge:${i + 1}#label`, answer: label, confidence: labelConfidence, answered_by: 'judgment-model', model: 'test-model' },
+    { question_id: `forge:${i + 1}#label@${TAG}`, answer: label, confidence: labelConfidence, answered_by: 'judgment-model', model: 'test-model' },
     { question_id: `forge:${i + 1}#severity`, answer: severity, confidence: 0.8, answered_by: 'agent' },
   ]);
   writeJsonl(join(dir, 'answers.jsonl'), answers);
@@ -102,7 +104,7 @@ test('ranks by count times severity, drops clusters under 3 changes or 2 reviewe
 
 test('lists only the low-confidence model answers that can change a kept cluster', () => {
   const dir = setup();
-  const low = { 'forge:1#severity': ['judgment-model', 0.4], 'forge:9#severity': ['judgment-model', 0.4], 'forge:12#label': ['judgment-model', 0.55], 'forge:2#label': ['agent', 0.3] };
+  const low = { 'forge:1#severity': ['judgment-model', 0.4], 'forge:9#severity': ['judgment-model', 0.4], [`forge:12#label@${TAG}`]: ['judgment-model', 0.55], [`forge:2#label@${TAG}`]: ['agent', 0.3] };
   const answers = readJsonl(join(dir, 'answers.jsonl')).map((a) => {
     const [by, confidence] = low[a.question_id] ?? [];
     return by ? { ...a, answered_by: by, confidence, model: by === 'agent' ? undefined : 'test-model' } : a;
@@ -114,7 +116,7 @@ test('lists only the low-confidence model answers that can change a kept cluster
   assert.deepEqual(validate(loadSchema('cluster.clusters'), out), []);
   assert.deepEqual(out.reanswer, [
     { question_id: 'forge:1#severity', confidence: 0.4, reason: 'severity changes the score of many-minor' },
-    { question_id: 'forge:12#label', confidence: 0.55, reason: 'label can move this comment between clusters' },
+    { question_id: `forge:12#label@${TAG}`, confidence: 0.55, reason: 'label can move this comment between clusters' },
   ]);
   assert.match(r.stdout, /2 low-confidence answers can change a cluster; re-answer them, then rerun/);
 });
@@ -125,7 +127,7 @@ test('refuses answers that do not match the questions', () => {
   writeJsonl(join(dir, 'answers.jsonl'), answers);
   const r = runNode('cluster.mjs', args, dir);
   assert.equal(r.status, 2);
-  assert.match(r.stderr, /answers do not match questions \(1 found, such as missing forge:1#label\); run questions\.mjs check/);
+  assert.match(r.stderr, /answers do not match questions \(1 found, such as missing forge:1#label@[0-9a-f]{8}\); run questions\.mjs check/);
   assert.doesNotMatch(r.stderr, /\n\s+at /);
 });
 

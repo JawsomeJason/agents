@@ -4,11 +4,13 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { readJsonl, runNode, tempDir, writeJsonl } from './helpers.mjs';
 import { loadSchema, validate } from './schema.mjs';
+import { labelTag } from '../skills/standards/scripts/questions.mjs';
 
 const LABELS = [
   { id: 'dto-at-boundary', description: 'Map database documents to DTOs before they leave a handler.' },
   { id: 'test-behavior', description: 'Tests assert observable behavior, not internals.' },
 ];
+const TAG = labelTag(LABELS);
 
 const review = (id, extra = {}) => ({
   id,
@@ -48,7 +50,7 @@ test('ask writes two valid questions per reviewer comment and skips bots and the
   assert.deepEqual(validate(loadSchema('questions.labels'), LABELS), []);
   assert.deepEqual(
     questions.map((q) => q.id),
-    ['forge:1#label', 'forge:1#severity', 'git-log:abc1234#label', 'git-log:abc1234#severity'],
+    [`forge:1#label@${TAG}`, 'forge:1#severity', `git-log:abc1234#label@${TAG}`, 'git-log:abc1234#severity'],
   );
   assert.deepEqual(questions[0].options, ['dto-at-boundary', 'test-behavior', 'none']);
   assert.equal(questions[0].option_descriptions['dto-at-boundary'], LABELS[0].description);
@@ -65,9 +67,9 @@ test('ask writes two valid questions per reviewer comment and skips bots and the
 
 const answer = (question_id, answer, confidence = 0.9) => ({ question_id, answer, confidence, answered_by: 'agent' });
 const matching = () => [
-  answer('forge:1#label', 'test-behavior'),
+  answer(`forge:1#label@${TAG}`, 'test-behavior'),
   answer('forge:1#severity', 'minor'),
-  answer('git-log:abc1234#label', 'none'),
+  answer(`git-log:abc1234#label@${TAG}`, 'none'),
   answer('git-log:abc1234#severity', 'nit'),
 ];
 const checkArgs = ['check', '--questions', 'questions.jsonl', '--answers', 'answers.jsonl'];
@@ -89,21 +91,21 @@ test('check rejects a mismatched answers file, lists every problem, and leaves l
   runNode('questions.mjs', askArgs, dir);
   const answers = matching();
   answers.splice(3, 1);
-  answers[0] = answer('forge:1#label', 'naming');
+  answers[0] = answer(`forge:1#label@${TAG}`, 'naming');
   answers[1] = answer('forge:1#severity', 'minor', 0.4);
-  answers.push(answer('forge:99#label', 'none'), answer('forge:1#severity', 'nit'), answer('forge:1#convention', true));
-  answers.push({ question_id: 'git-log:abc1234#label', answer: 'none', confidence: 0.9, answered_by: 'judgment-model' });
+  answers.push(answer(`forge:99#label@${TAG}`, 'none'), answer('forge:1#severity', 'nit'), answer('forge:1#convention', true));
+  answers.push({ question_id: `git-log:abc1234#label@${TAG}`, answer: 'none', confidence: 0.9, answered_by: 'judgment-model' });
   writeJsonl(join(dir, 'answers.jsonl'), answers);
   const r = runNode('questions.mjs', checkArgs, dir);
   assert.equal(r.status, 1);
   assert.equal(
     r.stdout,
     [
-      'invalid forge:1#label "naming" is not an option',
-      'unknown forge:99#label answers no question in the questions file',
+      `invalid forge:1#label@${TAG} "naming" is not an option`,
+      `unknown forge:99#label@${TAG} answers no question in the questions file`,
       'duplicate forge:1#severity has more than one answer',
       'unknown forge:1#convention answers no question in the questions file',
-      'duplicate git-log:abc1234#label has more than one answer',
+      `duplicate git-log:abc1234#label@${TAG} has more than one answer`,
       'missing git-log:abc1234#severity has no answer',
       '4 questions, 7 answers, 6 to fix',
       '',
@@ -126,4 +128,19 @@ test('expected failures print one clear line and no stack trace', () => {
     assert.match(r.stderr, message);
     assert.doesNotMatch(r.stderr, /\n\s+at /);
   }
+});
+
+test('changing the label set changes every label question id, so an old answer is unknown and the question is missing', () => {
+  const dir = setup();
+  runNode('questions.mjs', askArgs, dir);
+  writeJsonl(join(dir, 'answers.jsonl'), matching());
+  assert.equal(runNode('questions.mjs', checkArgs, dir).status, 0);
+  writeFileSync(join(dir, 'labels.json'), JSON.stringify([...LABELS, { id: 'wrap-errors', description: 'Wrap errors with context.' }]));
+  runNode('questions.mjs', askArgs, dir);
+  const r = runNode('questions.mjs', checkArgs, dir);
+  assert.equal(r.status, 1);
+  const lines = r.stdout.trim().split('\n');
+  assert.deepEqual(lines.filter((l) => l.startsWith('unknown')).map((l) => l.split(' ')[1]), [`forge:1#label@${TAG}`, `git-log:abc1234#label@${TAG}`]);
+  assert.equal(lines.filter((l) => /^missing \S+#label@/.test(l)).length, 2);
+  assert.ok(!lines.some((l) => l.includes('#severity')), 'severity answers keep their ids');
 });

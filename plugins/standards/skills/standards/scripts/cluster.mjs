@@ -51,7 +51,8 @@ export function cluster({ reviews, questions, answers, labels }) {
   const orphan = questions.find((q) => !reviewIds.has(q.review_id));
   if (orphan) throw new UsageError(`question ${orphan.id} names a review not in the reviews file; rerun questions.mjs ask`);
   const labelById = new Map(labels.map((l) => [l.id, l]));
-  const answer = (review, topic) => answered.get(`${review.id}#${topic}`);
+  const questionFor = new Map(questions.map((q) => [`${q.review_id}#${q.topic}`, q.id]));
+  const answer = (review, topic) => answered.get(questionFor.get(`${review.id}#${topic}`));
 
   const human = reviews.filter(isReviewerComment);
   const groups = new Map(labels.map((l) => [l.id, []]));

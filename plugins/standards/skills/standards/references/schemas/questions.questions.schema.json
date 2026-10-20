@@ -8,8 +8,8 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^.+#(label|severity)$",
-      "description": "The review_id, a #, then the topic, such as forge:123456#label."
+      "pattern": "^.+#(label@[0-9a-f]{8}|severity)$",
+      "description": "The review_id, a #, then the topic, such as forge:123456#severity. A label question's topic carries a hash of the label set, such as forge:123456#label@1a2b3c4d, so a changed label set asks it again."
     },
     "review_id": {
       "type": "string",

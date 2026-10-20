@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -88,8 +89,15 @@ function stateOf(review) {
   return parts.join('\n\n');
 }
 
+/**
+ * A short hash of the label set. A label question's id carries it, so adding, removing or rewording a label asks every
+ * label question again: an answer such as none, given before a fitting label existed, never carries over.
+ */
+export const labelTag = (labels) => createHash('sha256').update(JSON.stringify(labels.map((l) => [l.id, l.description]).sort())).digest('hex').slice(0, 8);
+
 // An id alone is too terse to choose between, so each option carries its label's description.
 export function ask(reviews, labels) {
+  const idSuffix = { label: `label@${labelTag(labels)}`, severity: 'severity' };
   const options = [...labels.map((l) => l.id), 'none'];
   const option_descriptions = Object.fromEntries([...labels.map((l) => [l.id, l.description]), ['none', NONE_DESCRIPTION]]);
   const seen = new Set();
@@ -99,7 +107,7 @@ export function ask(reviews, labels) {
     seen.add(review.id);
     if (!isReviewerComment(review)) continue;
     const state = stateOf(review);
-    const q = (topic, kind, extra) => ({ id: `${review.id}#${topic}`, review_id: review.id, topic, kind, prompt: PROMPTS[topic], state, ...extra });
+    const q = (topic, kind, extra) => ({ id: `${review.id}#${idSuffix[topic]}`, review_id: review.id, topic, kind, prompt: PROMPTS[topic], state, ...extra });
     questions.push(q('label', 'choice', { options, option_descriptions }), q('severity', 'score', { levels: SEVERITY_LEVELS, level_descriptions: SEVERITY_DESCRIPTIONS }));
   }
   return questions;
